@@ -14,18 +14,20 @@ function ResumePage() {
         </Link>
         <div className="w-full bg-[#1A1A1A] rounded-lg p-4 shadow-lg">
         <iframe
-          src="/Yaswanth_Resume.pdf"
-          className="w-full h-[800px] md:h-[1000px]"
-          style={{ border: "none" }}
-          title="Resume Viewer"
-        />
-        <a
-          href="/resume.pdf"
-          download
-          className="mt-4 inline-block text-blue-500 hover:underline"
-        >Download Resume
+        src="/Yaswanth_Resume.pdf"
+        width="100%"
+        height="800px"
+        style={{ border: "none" }}
+        title="Resume"
+      />
+
+      <a
+        href="/Yaswanth_Resume.pdf"
+        download
+        className="text-blue-500 hover:underline mt-4 inline-block"
+      >
+        Download Resume
       </a>
-      
 
         </div>
       </div>
