@@ -5,7 +5,7 @@ const projects = [
     id: 1,
     title: "LibriSys",
     description: "A web-based system for efficient management of library resources, user borrowing, and inventory tracking.",
-    image: "src/assets/projects/project-1.png",
+    image: "/project-1.png",
     tags: ["React", "TailwindCSS", "Node.js"],
     demoUrl: "#",
     githubUrl: "#",
@@ -15,7 +15,7 @@ const projects = [
     title: "Foodio",
     description:
       "A social platform for discovering, sharing, and exploring recipes from food enthusiasts around the world.",
-    image: "src/assets/projects/project-2.png",
+    image: "/project-2.png",
     tags: ["React", "MongoDB", "Node.js"],
     demoUrl: "#",
     githubUrl: "#",
@@ -25,7 +25,7 @@ const projects = [
     title: "E-commerce Platform",
     description:
       "Full-featured e-commerce platform with user authentication and payment processing.",
-    image: "src/assets/projects/project-3.png",
+    image: "/project-3.png",
     tags: ["React", "SpringBoot", "Stripe"],
     demoUrl: "#",
     githubUrl: "#",
