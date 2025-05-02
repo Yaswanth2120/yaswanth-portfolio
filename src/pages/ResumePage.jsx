@@ -6,11 +6,11 @@ function ResumePage() {
     <div className="min-h-screen bg-[#0A0A0A] pt-20">
       <div className="container mx-auto px-4">
         <Link
-          to="/#contact"
+          to="/"
           className="inline-flex items-center text-blue-400 hover:text-blue-300 mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Contact
+          Back to Page
         </Link>
         <div className="w-full bg-[#1A1A1A] rounded-lg p-4 shadow-lg">
         <iframe
