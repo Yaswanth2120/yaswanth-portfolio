@@ -8,10 +8,10 @@ export const HeroSection = () => {
       className="relative flex min-h-[72vh] items-center px-4 pt-24 pb-10 md:min-h-[68vh]"
     >
       <div className="container mx-auto max-w-6xl z-10">
-        <div className="grid items-center gap-8 lg:grid-cols-[1.2fr_0.9fr] xl:gap-10">
+        <div className="grid items-center gap-8 lg:grid-cols-[1.15fr_0.85fr] xl:gap-10">
           <div className="space-y-5 text-center lg:text-left">
             <div className="opacity-0 animate-fade-in">
-              <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-medium uppercase tracking-[0.24em] text-primary">
+              <span className="inline-flex items-center rounded-full border border-border bg-card px-4 py-1.5 text-xs font-medium uppercase tracking-[0.16em] text-foreground/72">
                 {portfolio.title}
               </span>
             </div>
@@ -21,7 +21,7 @@ export const HeroSection = () => {
                 {portfolio.name}
               </span>
               <span className="mt-2 block text-balance text-xl font-medium text-muted-foreground opacity-0 animate-fade-in-delay-2 md:text-2xl">
-                Building clean, useful products across the stack.
+                Distributed systems, backend services, and applied ML.
               </span>
             </h1>
 
@@ -41,11 +41,11 @@ export const HeroSection = () => {
 
           <div className="opacity-0 animate-fade-in-delay-4">
             <div className="hero-panel text-left">
-              <div className="mb-4 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-primary">
-                <span className="h-2 w-2 rounded-full bg-primary" />
+              <div className="mb-4 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                <span className="h-2 w-2 rounded-full bg-foreground/70" />
                 backend_profile.java
               </div>
-              <pre className="overflow-x-auto rounded-2xl bg-slate-950/92 p-4 text-xs leading-6 text-slate-200 md:text-sm">
+              <pre className="overflow-x-auto rounded-2xl bg-[#111827] p-4 text-xs leading-6 text-slate-200 md:text-sm">
                 <code>{`Developer yaswanth = new Developer();
 yaswanth.focus("Spring Boot", "Kafka", "Redis");
 yaswanth.build("Microservices", "ML Pipelines");

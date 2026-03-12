@@ -31,18 +31,20 @@ export const Navbar = () => {
       className={cn(
         "fixed inset-x-0 top-0 z-40 transition-all duration-300",
         isScrolled
-          ? "py-3 bg-background/78 backdrop-blur-xl border-b border-border/60 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.45)]"
-          : "py-5"
+          ? "py-3 bg-background/88 backdrop-blur-xl border-b border-border/70"
+          : "py-4"
       )}
     >
       <div className="container flex items-center justify-between gap-6">
         <a
-          className="flex items-center text-lg font-semibold uppercase tracking-[0.18em] text-foreground"
+          className="flex items-center text-base font-semibold tracking-[0.02em] text-foreground"
           href="#hero"
         >
           <span className="relative z-10 flex items-center gap-3">
-            <span className="h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_20px_rgba(14,165,233,0.8)]" />
-            {portfolio.shortName}
+            <span className="flex h-9 w-9 items-center justify-center rounded-2xl border border-border bg-card text-sm font-semibold text-foreground">
+              Y
+            </span>
+            <span>{portfolio.shortName} Portfolio</span>
           </span>
         </a>
 
@@ -51,7 +53,7 @@ export const Navbar = () => {
             <a
               key={key}
               href={item.href}
-              className="text-sm uppercase tracking-[0.18em] text-foreground/72 transition-colors duration-300 hover:text-primary"
+              className="text-sm text-foreground/72 transition-colors duration-300 hover:text-foreground"
             >
               {item.name}
             </a>
@@ -84,7 +86,7 @@ export const Navbar = () => {
               <a
                 key={key}
                 href={item.href}
-                className="text-foreground/80 hover:text-primary transition-colors duration-300"
+                className="text-foreground/80 transition-colors duration-300 hover:text-foreground"
                 onClick={() => setIsMenuOpen(false)}
               >
                 {item.name}
