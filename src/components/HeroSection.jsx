@@ -1,42 +1,63 @@
-import { ArrowDown } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { portfolio } from "@/data/portfolio";
 
 export const HeroSection = () => {
   return (
     <section
       id="hero"
-      className="relative min-h-screen flex flex-col items-center justify-center px-4"
+      className="relative flex min-h-[72vh] items-center px-4 pt-24 pb-10 md:min-h-[68vh]"
     >
-      <div className="container max-w-4xl mx-auto text-center z-10">
-        <div className="space-y-6">
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight">
-            <span className="opacity-0 animate-fade-in"> Hi, I'm</span>
-            <span className="text-primary opacity-0 animate-fade-in-delay-1">
-              {" "}
-              Yaswanth Sai
-            </span>
-            <span className="text-gradient ml-2 opacity-0 animate-fade-in-delay-2">
-              {" "}
-              Venkatesan
-            </span>
-          </h1>
+      <div className="container mx-auto max-w-6xl z-10">
+        <div className="grid items-center gap-8 lg:grid-cols-[1.2fr_0.9fr] xl:gap-10">
+          <div className="space-y-5 text-center lg:text-left">
+            <div className="opacity-0 animate-fade-in">
+              <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-medium uppercase tracking-[0.24em] text-primary">
+                {portfolio.title}
+              </span>
+            </div>
 
-          <p className="text-lg md:text-xl text-muted-foreground max-2-2xl mx-auto opacity-0 animate-fade-in-delay-3">
-            I create stellar web experiences with modern technologies.
-            Specializing in front-end development, I build interfaces that are
-            both beautiful and functional.
-          </p>
+            <h1 className="text-4xl font-bold tracking-tight md:text-6xl">
+              <span className="block opacity-0 animate-fade-in-delay-1">
+                {portfolio.name}
+              </span>
+              <span className="mt-2 block text-balance text-xl font-medium text-muted-foreground opacity-0 animate-fade-in-delay-2 md:text-2xl">
+                Building clean, useful products across the stack.
+              </span>
+            </h1>
 
-          <div className="pt-4 opacity-0 animate-fade-in-delay-4">
-            <a href="#projects" className="cosmic-button">
-              View My Work
-            </a>
+            <p className="mx-auto max-w-2xl text-base leading-7 text-muted-foreground opacity-0 animate-fade-in-delay-3 lg:mx-0">
+              {portfolio.summary}
+            </p>
+
+            <div className="flex flex-col items-center gap-3 pt-1 opacity-0 animate-fade-in-delay-4 sm:flex-row lg:items-start">
+              <a href="#projects" className="cosmic-button inline-flex items-center gap-2">
+                View Projects <ArrowRight size={16} />
+              </a>
+              <a href={portfolio.links.resume} className="secondary-button">
+                Open Resume
+              </a>
+            </div>
+          </div>
+
+          <div className="opacity-0 animate-fade-in-delay-4">
+            <div className="hero-panel text-left">
+              <div className="mb-4 flex items-center gap-2 text-xs uppercase tracking-[0.22em] text-primary">
+                <span className="h-2 w-2 rounded-full bg-primary" />
+                backend_profile.java
+              </div>
+              <pre className="overflow-x-auto rounded-2xl bg-slate-950/92 p-4 text-xs leading-6 text-slate-200 md:text-sm">
+                <code>{`Developer yaswanth = new Developer();
+yaswanth.focus("Spring Boot", "Kafka", "Redis");
+yaswanth.build("Microservices", "ML Pipelines");
+yaswanth.optimize("Latency", "Scalability");
+yaswanth.deploy("Docker", "Jenkins", "AWS");`}</code>
+              </pre>
+              <div className="mt-4 text-sm text-muted-foreground">
+                Java, Python, JavaScript, distributed systems, and real-time ML.
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center animate-bounce">
-        <span className="text-sm text-muted-foreground mb-2"> Scroll </span>
-        <ArrowDown className="h-5 w-5 text-primary" />
       </div>
     </section>
   );

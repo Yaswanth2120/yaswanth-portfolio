@@ -1,188 +1,138 @@
 import {
-    Instagram,
-    Linkedin,
-    Mail,
-    MapPin,
-    Phone,
-    Send,
-    Twitch,
-    Twitter,
-  } from "lucide-react";
-  import { cn } from "@/lib/utils";
-  import { useToast } from "@/hooks/use-toast";
-  import { useState } from "react";
-  
-  export const ContactSection = () => {
-    const { toast } = useToast();
-    const [isSubmitting, setIsSubmitting] = useState(false);
-  
-    const handleSubmit = (e) => {
-      e.preventDefault();
-  
-      setIsSubmitting(true);
-  
-      setTimeout(() => {
-        toast({
-          title: "Message sent!",
-          description: "Thank you for your message. I'll get back to you soon.",
-        });
-        setIsSubmitting(false);
-      }, 1500);
-    };
-    return (
-      <section id="contact" className="py-24 px-4 relative bg-secondary/30">
-        <div className="container mx-auto max-w-5xl">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-center">
-            Get In <span className="text-primary"> Touch</span>
-          </h2>
-  
-          <p className="text-center text-muted-foreground mb-12 max-w-2xl mx-auto">
-            Have a project in mind or want to collaborate? Feel free to reach out.
-            I'm always open to discussing new opportunities.
+  Download,
+  Mail,
+  FileText,
+  Github,
+  Linkedin,
+  MapPin,
+  Phone,
+} from "lucide-react";
+import { portfolio } from "@/data/portfolio";
+
+const contactCards = [
+  {
+    title: "LinkedIn",
+    description: "Professional profile and networking.",
+    href: portfolio.links.linkedin,
+    label: "Open LinkedIn",
+    icon: Linkedin,
+  },
+  {
+    title: "GitHub",
+    description: "Code samples and public work.",
+    href: portfolio.links.github,
+    label: "Open GitHub",
+    icon: Github,
+  },
+  {
+    title: "Resume",
+    description: "View or download the latest resume PDF.",
+    href: portfolio.links.resumeFile,
+    label: "Download Resume",
+    icon: Download,
+  },
+];
+
+export const ContactSection = () => {
+  return (
+    <section id="contact" className="section-shell section-muted relative px-4">
+      <div className="container mx-auto max-w-6xl">
+        <div className="section-heading">
+          <span className="section-kicker">Contact</span>
+          <h2 className="text-3xl font-bold md:text-5xl">Let&apos;s connect.</h2>
+          <p className="mx-auto max-w-3xl text-muted-foreground">
+            Direct contact details, resume access, and profile links from the
+            updated portfolio.
           </p>
-  
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <div className="space-y-8">
-              <h3 className="text-2xl font-semibold mb-6">
-                {" "}
-                Contact Information
-              </h3>
-  
-              <div className="space-y-6 justify-center">
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 rounded-full bg-primary/10">
-                    <Mail className="h-6 w-6 text-primary" />{" "}
-                  </div>
-                  <div>
-                    <h4 className="font-medium"> Email</h4>
-                    <a
-                      href="mailto:demo@gmail.com"
-                      className="text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      username@gmail.com
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 rounded-full bg-primary/10">
-                    <Phone className="h-6 w-6 text-primary" />{" "}
-                  </div>
-                  <div>
-                    <h4 className="font-medium"> Phone</h4>
-                    <a
-                      href="tel:+11234567890"
-                      className="text-muted-foreground hover:text-primary transition-colors"
-                    >
-                      +1 (123) 456-7890
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-4">
-                  <div className="p-3 rounded-full bg-primary/10">
-                    <MapPin className="h-6 w-6 text-primary" />{" "}
-                  </div>
-                  <div>
-                    <h4 className="font-medium"> Location</h4>
-                    <a className="text-muted-foreground hover:text-primary transition-colors">
-                      Montgomery, AL, USA
-                    </a>
-                  </div>
-                </div>
-              </div>
-  
-              <div className="pt-8">
-                <h4 className="font-medium mb-4"> Connect With Me</h4>
-                <div className="flex space-x-4 justify-center">
-                  <a href="https://www.linkedin.com/in/yaswanth-sai-v-075a4816b/" target="_blank">
-                    <Linkedin />
-                  </a>
-                  <a href="#" target="_blank">
-                    <Twitter />
-                  </a>
-                  <a href="#" target="_blank">
-                    <Instagram />
-                  </a>
-                  <a href="#" target="_blank">
-                    <Twitch />
-                  </a>
-                </div>
-              </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[1fr_1.35fr]">
+          <div className="rounded-[24px] border border-border/70 bg-card/85 p-6 text-left shadow-[0_28px_80px_-46px_rgba(15,23,42,0.7)]">
+            <div className="mb-4 inline-flex rounded-full border border-primary/25 bg-primary/10 p-3 text-primary">
+              <FileText className="h-6 w-6" />
             </div>
-  
-            <div
-              className="bg-card p-8 rounded-lg shadow-xs"
-              onSubmit={handleSubmit}
-            >
-              <h3 className="text-2xl font-semibold mb-6"> Send a Message</h3>
-  
-              <form className="space-y-6">
-                <div>
-                  <label
-                    htmlFor="name"
-                    className="block text-sm font-medium mb-2"
-                  >
-                    {" "}
-                    Your Name
-                  </label>
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    required
-                    className="w-full px-4 py-3 rounded-md border border-input bg-background focus:outline-hidden foucs:ring-2 focus:ring-primary"
-                    placeholder="Yaswanth Sai..."
-                  />
+            <h3 className="text-xl font-semibold">{portfolio.name}</h3>
+            <p className="mt-2 text-sm text-muted-foreground">{portfolio.summary}</p>
+
+            <div className="mt-6 space-y-4">
+              <div className="flex items-start gap-4">
+                <div className="rounded-full bg-primary/10 p-3">
+                  <Mail className="h-5 w-5 text-primary" />
                 </div>
-  
                 <div>
-                  <label
-                    htmlFor="email"
-                    className="block text-sm font-medium mb-2"
+                  <div className="text-sm uppercase tracking-[0.18em] text-muted-foreground">
+                    Email
+                  </div>
+                  <a
+                    href={`mailto:${portfolio.email}`}
+                    className="mt-1 block font-medium hover:text-primary"
                   >
-                    {" "}
-                    Your Email
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    required
-                    className="w-full px-4 py-3 rounded-md border border-input bg-background focus:outline-hidden foucs:ring-2 focus:ring-primary"
-                    placeholder="johndoe@gmail.com"
-                  />
+                    {portfolio.email}
+                  </a>
                 </div>
-  
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="rounded-full bg-primary/10 p-3">
+                  <Phone className="h-5 w-5 text-primary" />
+                </div>
                 <div>
-                  <label
-                    htmlFor="message"
-                    className="block text-sm font-medium mb-2"
+                  <div className="text-sm uppercase tracking-[0.18em] text-muted-foreground">
+                    Phone
+                  </div>
+                  <a
+                    href={`tel:${portfolio.phone.replace(/[^+\d]/g, "")}`}
+                    className="mt-1 block font-medium hover:text-primary"
                   >
-                    {" "}
-                    Your Message
-                  </label>
-                  <textarea
-                    id="message"
-                    name="message"
-                    required
-                    className="w-full px-4 py-3 rounded-md border border-input bg-background focus:outline-hidden foucs:ring-2 focus:ring-primary resize-none"
-                    placeholder="Hello, I'd like to talk about..."
-                  />
+                    {portfolio.phone}
+                  </a>
                 </div>
-  
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={cn(
-                    "cosmic-button w-full flex items-center justify-center gap-2"
-                  )}
-                >
-                  {isSubmitting ? "Sending..." : "Send Message"}
-                  <Send size={16} />
-                </button>
-              </form>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <div className="rounded-full bg-primary/10 p-3">
+                  <MapPin className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <div className="text-sm uppercase tracking-[0.18em] text-muted-foreground">
+                    Location
+                  </div>
+                  <div className="mt-1 font-medium">{portfolio.location}</div>
+                </div>
+              </div>
             </div>
           </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {contactCards.map((card) => {
+              const Icon = card.icon;
+
+              return (
+                <a
+                  key={card.title}
+                  href={card.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex min-h-44 flex-col justify-between rounded-[24px] border border-border/70 bg-background/78 p-5 text-left shadow-[0_24px_70px_-50px_rgba(15,23,42,0.72)] card-hover"
+                >
+                  <div>
+                    <div className="mb-4 inline-flex rounded-full bg-primary/10 p-3 text-primary">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-lg font-semibold">{card.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {card.description}
+                    </p>
+                  </div>
+                  <span className="mt-6 text-sm uppercase tracking-[0.18em] text-primary">
+                    {card.label}
+                  </span>
+                </a>
+              );
+            })}
+          </div>
         </div>
-      </section>
-    );
-  };
+      </div>
+    </section>
+  );
+};

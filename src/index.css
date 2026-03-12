@@ -64,27 +64,27 @@
 
 @layer base {
   :root {
-    --background: 0 0% 95%;
-    --foreground: 222 47% 11%;
+    --background: 42 43% 97%;
+    --foreground: 210 31% 14%;
 
     --card: 0 0% 100%;
 
-    --primary: 250 47% 60%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 195 88% 43%;
+    --primary-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
+    --border: 30 18% 84%;
   }
 
   .dark {
-    --background: 222 47% 4%;
-    --foreground: 213 31% 91%;
+    --background: 210 34% 8%;
+    --foreground: 40 25% 92%;
 
-    --card: 222 47% 8%;
+    --card: 210 28% 12%;
 
-    --primary: 250 65% 65%;
-    --primary-foreground: 213 31% 91%;
+    --primary: 190 92% 57%;
+    --primary-foreground: 210 34% 8%;
 
-    --border: 217 33% 20%;
+    --border: 210 21% 22%;
   }
 
   * {
@@ -93,11 +93,25 @@
 
   html {
     @apply scroll-smooth;
+    scroll-padding-top: 6rem;
   }
 
   body {
     @apply bg-background text-foreground transition-colors duration-300;
+    background-image:
+      linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(14, 165, 233, 0.05), transparent 22%);
+    background-size: 24px 24px, 24px 24px, auto;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  .dark body {
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(14, 165, 233, 0.12), rgba(8, 15, 23, 0));
+    background-size: 24px 24px, 24px 24px, auto;
   }
 }
 
@@ -124,11 +138,11 @@
 
 @utility text-glow {
   @apply relative;
-  text-shadow: 0 0 10px rgba(167, 139, 250, 0.5);
+  text-shadow: 0 0 18px rgba(14, 165, 233, 0.4);
 }
 
 @utility card-hover {
-  @apply transition-transform duration-300 hover:scale-[1.02] hover:shadow-lg;
+  @apply transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg;
 }
 
 @utility gradient-border {
@@ -140,18 +154,32 @@
 
 @utility cosmic-button {
   @apply px-6 py-2 rounded-full bg-primary text-primary-foreground font-medium 
-         transition-all duration-300 hover:shadow-[0_0_10px_rgba(139,92,246,0.5)]
+         transition-all duration-300 hover:shadow-[0_0_18px_rgba(14,165,233,0.35)]
          hover:scale-105 active:scale-95;
 }
 
-@utility star {
-  @apply absolute rounded-full bg-white;
-  box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.4);
+@utility secondary-button {
+  @apply inline-flex items-center justify-center rounded-full border border-primary/25 bg-background/80 px-6 py-2 font-medium text-primary transition-all duration-300 hover:border-primary/45 hover:bg-primary/8;
 }
 
-@utility meteor {
-  @apply absolute bg-linear-to-r from-white via-white to-transparent rounded-full;
-  box-shadow: 0 0 10px 5px rgba(255, 255, 255, 0.3);
+@utility section-shell {
+  @apply py-14 md:py-16;
+}
+
+@utility section-muted {
+  @apply bg-white/45 dark:bg-white/3;
+}
+
+@utility section-heading {
+  @apply mb-8 space-y-3 text-center;
+}
+
+@utility section-kicker {
+  @apply inline-flex rounded-full border border-primary/25 bg-primary/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary;
+}
+
+@utility hero-panel {
+  @apply rounded-[28px] border border-border/70 bg-card/78 p-5 shadow-[0_32px_90px_-52px_rgba(15,23,42,0.8)] backdrop-blur-sm;
 }
 
 #root {

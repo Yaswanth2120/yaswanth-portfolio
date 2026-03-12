@@ -1,0 +1,26 @@
+<svg width="1200" height="720" viewBox="0 0 1200 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="720" rx="40" fill="#07131D"/>
+  <rect x="44" y="44" width="1112" height="632" rx="30" fill="#0D1D2B"/>
+  <text x="100" y="118" fill="#F4FAFF" font-family="monospace" font-size="50" font-weight="700">Real-Time Recommendation Engine</text>
+  <path d="M102 164H470" stroke="#1EA7FF" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="250" cy="360" r="110" fill="#12263B" stroke="#1EA7FF" stroke-width="4"/>
+  <circle cx="250" cy="360" r="56" fill="#1EA7FF" fill-opacity="0.15" stroke="#7DCEFF" stroke-width="3"/>
+  <circle cx="250" cy="360" r="12" fill="#DFF5FF"/>
+  <circle cx="205" cy="320" r="10" fill="#4DD4AC"/>
+  <circle cx="298" cy="312" r="10" fill="#FFB547"/>
+  <circle cx="312" cy="398" r="10" fill="#FF6E7A"/>
+  <circle cx="192" cy="412" r="10" fill="#B388FF"/>
+  <rect x="470" y="270" width="250" height="180" rx="28" fill="#12263B" stroke="#4DD4AC" stroke-width="4"/>
+  <text x="536" y="348" fill="#F4FAFF" font-family="monospace" font-size="34">ML Model</text>
+  <text x="518" y="396" fill="#90B4D8" font-family="monospace" font-size="26">predict(user_id)</text>
+  <rect x="850" y="250" width="220" height="90" rx="22" fill="#16263B" stroke="#FFB547" stroke-width="3"/>
+  <rect x="850" y="370" width="220" height="90" rx="22" fill="#16263B" stroke="#FFB547" stroke-width="3"/>
+  <rect x="850" y="490" width="220" height="90" rx="22" fill="#16263B" stroke="#FFB547" stroke-width="3"/>
+  <text x="902" y="306" fill="#F9FCFF" font-family="monospace" font-size="26">Top Picks</text>
+  <text x="920" y="426" fill="#F9FCFF" font-family="monospace" font-size="26">Redis</text>
+  <text x="912" y="546" fill="#F9FCFF" font-family="monospace" font-size="26">Kafka</text>
+  <path d="M360 360H470" stroke="#7DA2C7" stroke-width="10" stroke-linecap="round" stroke-dasharray="12 14"/>
+  <path d="M720 360H850" stroke="#7DA2C7" stroke-width="10" stroke-linecap="round" stroke-dasharray="12 14"/>
+  <path d="M960 340V370" stroke="#FFB547" stroke-width="8" stroke-linecap="round"/>
+  <path d="M960 460V490" stroke="#FFB547" stroke-width="8" stroke-linecap="round"/>
+</svg>

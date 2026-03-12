@@ -1,54 +1,37 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { portfolio } from "@/data/portfolio";
 
-const skills = [
-  // Frontend
-  { name: "HTML/CSS", level: 95, category: "frontend" },
-  { name: "JavaScript", level: 90, category: "frontend" },
-  { name: "React", level: 90, category: "frontend" },
-  { name: "BootStrap", level: 85, category: "frontend" },
-  { name: "Tailwind CSS", level: 90, category: "frontend" },
-  { name: "Next.js", level: 80, category: "frontend" },
-
-  // Backend
-  { name: "Node.js", level: 80, category: "backend" },
-  { name: "Express", level: 75, category: "backend" },
-  { name: "MongoDB", level: 70, category: "backend" },
-  { name: "MySQL", level: 65, category: "backend" },
-  { name: "SpringBoot", level: 60, category: "backend" },
-
-  // Tools
-  { name: "Git/GitHub", level: 90, category: "tools" },
-  { name: "Service Now", level: 70, category: "tools" },
-  { name: "Figma", level: 85, category: "tools" },
-  { name: "VS Code", level: 95, category: "tools" },
-];
-
-const categories = ["all", "frontend", "backend", "tools"];
+const categories = ["all", "languages", "frameworks", "databases", "infrastructure"];
 
 export const SkillsSection = () => {
   const [activeCategory, setActiveCategory] = useState("all");
 
-  const filteredSkills = skills.filter(
+  const filteredSkills = portfolio.skills.filter(
     (skill) => activeCategory === "all" || skill.category === activeCategory
   );
   return (
-    <section id="skills" className="py-24 px-4 relative bg-secondary/30">
-      <div className="container mx-auto max-w-5xl">
-        <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center">
-          My <span className="text-primary"> Skills</span>
-        </h2>
+    <section id="skills" className="section-shell section-muted relative px-4">
+      <div className="container mx-auto max-w-6xl">
+        <div className="section-heading">
+          <span className="section-kicker">Skills</span>
+          <h2 className="text-3xl font-bold md:text-5xl">Core stack and tools.</h2>
+          <p className="mx-auto max-w-3xl text-muted-foreground">
+            Technologies are grouped directly from the resume: languages, frameworks,
+            databases, and infrastructure.
+          </p>
+        </div>
 
-        <div className="flex flex-wrap justify-center gap-4 mb-12">
+        <div className="mb-8 flex flex-wrap justify-center gap-3">
           {categories.map((category, key) => (
             <button
               key={key}
               onClick={() => setActiveCategory(category)}
               className={cn(
-                "px-5 py-2 rounded-full transition-colors duration-300 capitalize",
+                "rounded-full border px-5 py-2 text-sm font-medium uppercase tracking-[0.18em] transition-all duration-300 capitalize",
                 activeCategory === category
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary/70 text-forefround hover:bd-secondary"
+                  ? "border-primary bg-primary text-primary-foreground shadow-[0_18px_35px_-20px_rgba(14,165,233,0.85)]"
+                  : "border-border/70 bg-background/70 text-foreground/75 hover:border-primary/40 hover:text-primary"
               )}
             >
               {category}
@@ -56,26 +39,16 @@ export const SkillsSection = () => {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {filteredSkills.map((skill, key) => (
             <div
               key={key}
-              className="bg-card p-6 rounded-lg shadow-xs card-hover"
+              className="card-hover rounded-2xl border border-border/70 bg-card/80 p-4 text-left shadow-[0_24px_60px_-42px_rgba(15,23,42,0.55)]"
             >
-              <div className="text-left mb-4">
-                <h3 className="font-semibold text-lg"> {skill.name}</h3>
+              <div className="mb-3 text-xs uppercase tracking-[0.18em] text-primary">
+                {skill.category}
               </div>
-              <div className="w-full bg-secondary/50 h-2 rounded-full overflow-hidden">
-                <div
-                  className="bg-primary h-2 rounded-full origin-left animate-[grow_1.5s_ease-out]"
-                  style={{ width: skill.level + "%" }}
-                />
-              </div>
-
-              <div className="text-right mt-1">
-                <span className="text-sm text-muted-foreground">
-                </span>
-              </div>
+              <h3 className="text-base font-semibold">{skill.name}</h3>
             </div>
           ))}
         </div>

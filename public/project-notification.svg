@@ -1,0 +1,17 @@
+<svg width="1200" height="720" viewBox="0 0 1200 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="720" rx="40" fill="#08111B"/>
+  <rect x="40" y="40" width="1120" height="640" rx="32" fill="#0E1B2A"/>
+  <path d="M130 170H510" stroke="#1EA7FF" stroke-width="14" stroke-linecap="round"/>
+  <path d="M130 220H390" stroke="#4DD4AC" stroke-width="10" stroke-linecap="round" opacity="0.9"/>
+  <rect x="120" y="300" width="250" height="150" rx="24" fill="#12263B" stroke="#1EA7FF" stroke-width="3"/>
+  <rect x="475" y="300" width="250" height="150" rx="24" fill="#12263B" stroke="#4DD4AC" stroke-width="3"/>
+  <rect x="830" y="300" width="250" height="150" rx="24" fill="#12263B" stroke="#FFB547" stroke-width="3"/>
+  <path d="M370 375H475" stroke="#7DA2C7" stroke-width="8" stroke-linecap="round" stroke-dasharray="14 16"/>
+  <path d="M725 375H830" stroke="#7DA2C7" stroke-width="8" stroke-linecap="round" stroke-dasharray="14 16"/>
+  <circle cx="332" cy="374" r="10" fill="#1EA7FF"/>
+  <circle cx="686" cy="374" r="10" fill="#4DD4AC"/>
+  <circle cx="1041" cy="374" r="10" fill="#FFB547"/>
+  <rect x="125" y="515" width="950" height="90" rx="20" fill="#0C1724"/>
+  <text x="150" y="570" fill="#D7E7F6" font-family="monospace" font-size="34">events.publish("notification.created")</text>
+  <text x="120" y="120" fill="#F4FAFF" font-family="monospace" font-size="52" font-weight="700">Distributed Notification Platform</text>
+</svg>

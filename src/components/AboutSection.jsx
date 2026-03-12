@@ -1,93 +1,70 @@
 import { Briefcase, Code, User } from "lucide-react";
-import { Spotlight } from "../components/ui/Spotlight"; 
+import { Spotlight } from "../components/ui/Spotlight";
+import { portfolio } from "@/data/portfolio";
+
+const icons = [Code, User, Briefcase];
 
 export const AboutSection = () => {
   return (
-    <section id="about" className="py-24 px-4 relative">
-      <div className="container mx-auto max-w-5xl">
-        <h2 className="text-3xl md:text-4xl font-bold mb-12 text-center">
-          About <span className="text-primary"> Me</span>
-        </h2>
+    <section id="about" className="section-shell relative px-4">
+      <div className="container mx-auto max-w-6xl">
+        <div className="section-heading">
+          <span className="section-kicker">Experience</span>
+          <h2 className="text-3xl md:text-5xl font-bold text-balance">
+            Education and recent work in one view.
+          </h2>
+          <p className="mx-auto max-w-3xl text-muted-foreground">
+            {portfolio.intro}
+          </p>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          {/* Left Content */}
-          <div className="space-y-6">
-            <h3 className="text-2xl font-semibold">
-              Passionate Web Developer & Tech Creator
-            </h3>
-
-            <p className="text-muted-foreground">
-              With over 1.5 years of experience in development, I specialize
-              in creating responsive, accessible, and performant web
-              applications using modern technologies.
-            </p>
-
-            <p className="text-muted-foreground">
-              I'm passionate about creating elegant solutions to complex
-              problems, and I'm constantly learning new technologies and
-              techniques to stay at the forefront of the ever-evolving web
-              landscape.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 pt-4 justify-center">
-              <a href="#contact" className="cosmic-button">
-                Get In Touch
-              </a>
-
-              <a
-                href="/resume"
-                className="px-6 py-2 rounded-full border border-primary text-primary hover:bg-primary/10 transition-colors duration-300"
-              >
-                Download CV
-              </a>
+        <div className="grid gap-6 lg:grid-cols-[0.9fr_1.35fr]">
+          <div className="rounded-[24px] border border-border/70 bg-card/82 p-5 text-left shadow-[0_24px_70px_-50px_rgba(15,23,42,0.72)]">
+            <h3 className="mb-4 text-xl font-semibold">Education</h3>
+            <div className="space-y-4">
+              {portfolio.education.map((item) => (
+                <div key={item.school} className="border-l-2 border-primary/30 pl-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-primary">
+                    {item.period}
+                  </div>
+                  <h4 className="mt-2 text-lg font-semibold">{item.school}</h4>
+                  <p className="text-muted-foreground">{item.degree}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{item.location}</p>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right Side Cards with Spotlight */}
-          <Spotlight className="grid grid-cols-1 gap-6">
-            <div className="gradient-border p-6 card-hover">
-              <div className="flex items-start gap-4">
-                <div className="p-3 rounded-full bg-primary/10">
-                  <Code className="h-6 w-6 text-primary" />
-                </div>
-                <div className="text-left">
-                  <h4 className="font-semibold text-lg">Web Development</h4>
-                  <p className="text-muted-foreground">
-                    Creating responsive websites and web applications with
-                    modern frameworks.
-                  </p>
-                </div>
-              </div>
-            </div>
+          <Spotlight className="grid grid-cols-1 gap-4">
+            {portfolio.experience.map((item, index) => {
+              const Icon = icons[index] ?? Briefcase;
 
-            <div className="gradient-border p-6 card-hover">
-              <div className="flex items-start gap-4">
-                <div className="p-3 rounded-full bg-primary/10">
-                  <User className="h-6 w-6 text-primary" />
-                </div>
-                <div className="text-left">
-                  <h4 className="font-semibold text-lg">Machine Learning</h4>
-                  <p className="text-muted-foreground">
-                  Building intelligent systems through data-driven learning and predictive modeling.
-                  </p>
-                </div>
-              </div>
-            </div>
+              return (
+                <div key={item.role} className="gradient-border card-hover p-5 text-left">
+                  <div className="mb-3 flex items-start gap-3">
+                    <div className="rounded-full bg-primary/10 p-2.5">
+                      <Icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="text-xs uppercase tracking-[0.18em] text-primary">
+                        {item.period}
+                      </div>
+                      <h4 className="mt-1 text-lg font-semibold">{item.role}</h4>
+                      <p className="text-muted-foreground">{item.company}</p>
+                    </div>
+                  </div>
 
-            <div className="gradient-border p-6 card-hover">
-              <div className="flex items-start gap-4">
-                <div className="p-3 rounded-full bg-primary/10">
-                  <Briefcase className="h-6 w-6 text-primary" />
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    {item.highlights.map((point) => (
+                      <li key={point} className="flex gap-3">
+                        <span className="mt-2 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="text-left">
-                  <h4 className="font-semibold text-lg">Project Management</h4>
-                  <p className="text-muted-foreground">
-                    Leading projects from conception to completion with agile
-                    methodologies.
-                  </p>
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </Spotlight>
         </div>
       </div>

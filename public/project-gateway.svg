@@ -1,0 +1,21 @@
+<svg width="1200" height="720" viewBox="0 0 1200 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="720" rx="40" fill="#0A0F18"/>
+  <rect x="42" y="42" width="1116" height="636" rx="30" fill="#101827"/>
+  <text x="110" y="120" fill="#F4FAFF" font-family="monospace" font-size="52" font-weight="700">Intelligent API Gateway</text>
+  <path d="M110 170H430" stroke="#1EA7FF" stroke-width="12" stroke-linecap="round"/>
+  <path d="M110 210H330" stroke="#7CFFB2" stroke-width="8" stroke-linecap="round"/>
+  <rect x="120" y="270" width="220" height="220" rx="28" fill="#142033" stroke="#1EA7FF" stroke-width="3"/>
+  <text x="178" y="392" fill="#DFF5FF" font-family="monospace" font-size="34">Client</text>
+  <rect x="490" y="220" width="240" height="320" rx="32" fill="#111E30" stroke="#7CFFB2" stroke-width="4"/>
+  <text x="545" y="335" fill="#F4FAFF" font-family="monospace" font-size="38">JWT</text>
+  <text x="530" y="390" fill="#8FB1D3" font-family="monospace" font-size="28">rate_limit()</text>
+  <text x="520" y="435" fill="#8FB1D3" font-family="monospace" font-size="28">trace_request()</text>
+  <text x="526" y="480" fill="#8FB1D3" font-family="monospace" font-size="28">circuit_breaker()</text>
+  <rect x="880" y="250" width="180" height="100" rx="24" fill="#16263B" stroke="#FFB547" stroke-width="3"/>
+  <rect x="880" y="390" width="180" height="100" rx="24" fill="#16263B" stroke="#FFB547" stroke-width="3"/>
+  <text x="927" y="312" fill="#F9FCFF" font-family="monospace" font-size="28">svc-A</text>
+  <text x="927" y="452" fill="#F9FCFF" font-family="monospace" font-size="28">svc-B</text>
+  <path d="M340 380H490" stroke="#7DA2C7" stroke-width="10" stroke-linecap="round"/>
+  <path d="M730 305H880" stroke="#7DA2C7" stroke-width="10" stroke-linecap="round"/>
+  <path d="M730 445H880" stroke="#7DA2C7" stroke-width="10" stroke-linecap="round"/>
+</svg>
