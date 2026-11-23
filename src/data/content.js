@@ -132,7 +132,7 @@ export const content = {
         org: "Agile Technologies",
         role: "Software Engineer",
         period: "Mar 2026 — Present",
-        place: "Cottonwood, AZ",
+        place: "Virginia, US",
         // TODO: confirm; these are placeholders until there's a summary for this role.
         tools: ["Agents", "LLM systems", "APIs", "Interfaces"],
       },
