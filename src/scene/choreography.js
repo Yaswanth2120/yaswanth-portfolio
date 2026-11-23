@@ -4,13 +4,13 @@
 //   0       intro: a curved office, 18 people working across three live projects
 //   1 – 4   half the team presents at the whiteboard (server room behind);
 //           the rest keep working at their desks
-//   5 – 7   experience, "the walk": you walk a single path across an open
-//           plain; one monolith per job rises from the ground as you reach it,
-//           and the trail draws itself behind you. The team is back at work.
-//   8       contact. On the way there (7 → 8) the walker fades, you sit at the desk, the
+//   5 – 7   experience, "chapters": a book on a writing table in the open
+//           plain. It opens as you arrive; each job is one spread, and the page
+//           turns as you scroll to the next. The team is back at work.
+//   8       contact. On the way there (7 → 8) the book fades, you sit at the desk, the
 //           team merges into you, and the screens fan out above.
 
-// Number of jobs (one stop and one monolith each): keep in sync with content.experience.items.
+// Number of jobs (one stop and one book spread each): keep in sync with content.experience.items.
 export const JOBS = 3;
 export const STOPS = { intro: 0, projectsStart: 1, experienceStart: 5, end: 5 + JOBS };
 // Shorthand: B = projects start, M = last milestone. Transitions are placed relative to these.
@@ -42,9 +42,16 @@ export const zoneSlot = (i) => i % 6;
 const SEAT_OFFSET = 0.85;
 // Board canvas is 1024 × 490, so width / (height × 0.98) keeps that 2.09 aspect.
 export const WHITEBOARD = { x: 0, z: -12, y: 2.05, width: 6.2, height: 3.03 };
-// The experience path: a straight line across the plain, one monolith per job.
-export const PATH = { z: -20, from: -10, to: 10, xs: Array.from({ length: JOBS }, (_, k) => (k - (JOBS - 1) / 2) * 5.5) };
-export const MONOLITH = { w: 1.6, h: 3.4, d: 0.36 };
+// The experience book, open on a writing table. Pages are W × H; the spine runs
+// along z at x = BOOK.x, and the page tops point away from the camera (-z).
+export const BOOK = { x: 0, z: -20, table: 0.92, pageW: 1.6, pageH: 2.1 };
+/**
+ * Leaves in reading order. A leaf has a front (seen on the right before it turns)
+ * and a back (seen on the left after). Pages: cover | inside cover · title |
+ * chapter 1 · details 1 | chapter 2 · details 2 | … The final details page sits
+ * on the last leaf's front and never turns.
+ */
+export const LEAVES = JOBS + 2;
 export const HERO = { x: 0, z: -3 };
 
 // ---------- math helpers ----------
@@ -166,36 +173,22 @@ export function personTarget(i, s) {
 export const worldOpacity = (s) => 1 - smoothRange(M + 0.3, M + 0.6, s);
 export const peopleOpacity = (s) => 1 - smoothRange(M + 0.66, M + 0.78, s);
 export const heroOpacity = (s) => smoothRange(M + 0.64, MERGED, s);
-// ---------- experience: the walk ----------
-/** 0 → 1 as monolith k (job k) rises out of the ground. */
-export const monolithRise = (k, s) => smoothRange(E + k - 0.6, E + k - 0.05, s);
-/** Where you stand at milestone k: just left of its monolith, a step in front of it. */
-const walkSpot = (k) => ({ x: PATH.xs[k] - 1.15, z: PATH.z + 0.75 });
-
-/**
- * The walker (you): onto the path, then monolith to monolith, resting at each
- * stop. After the last one he stays and fades with the plain while the seated
- * figure appears at the desk. Returns { x, z, onPath, atStop }.
- */
-export function walkerTarget(s) {
-  if (s < E) {
-    const t = smoothRange(E - 0.6, E, s);
-    return { x: mix(PATH.from, walkSpot(0).x, t), z: walkSpot(0).z, onPath: true, atStop: t >= 1 };
-  }
-  if (s <= M + 0.2) {
-    const u = Math.min(JOBS - 1, s - E);
-    const k = Math.min(JOBS - 2, Math.floor(u));
-    const f = smoothRange(0.3, 0.95, u - k); // rest near each stop, walk in between
-    const a = walkSpot(k);
-    const b = walkSpot(k + 1);
-    return { x: mix(a.x, b.x, f), z: a.z, onPath: true, atStop: f <= 0 || f >= 1 };
-  }
-  return { ...walkSpot(JOBS - 1), onPath: true, atStop: true };
-}
-/** The walker fades in onto the path and out with the plain at the end. */
-export const walkerOpacity = (s) => smoothRange(E - 0.6, E - 0.35, s) * (1 - smoothRange(M + 0.25, M + 0.5, s));
 /** 0 → 1 as screen i of the final fan flies in. */
 export const fanIn = (i, s) => smoothRange(M + 0.62 + i * 0.025, M + 0.82 + i * 0.025, s);
+
+// ---------- experience: the book ----------
+/**
+ * 0 → 1 as leaf i turns from the right side to the left. The cover and title
+ * leaf turn as you arrive; then one leaf per job, between its stop and the next.
+ */
+export function leafTurn(i, s) {
+  if (i === 0) return smoothRange(E - 0.8, E - 0.45, s); // cover opens
+  if (i === 1) return smoothRange(E - 0.45, E - 0.08, s); // title page
+  const k = i - 2; // turning from spread k to k + 1
+  if (k >= JOBS - 1) return 0;
+  return smoothRange(E + k + 0.3, E + k + 0.85, s);
+}
+
 /** Index of the project on the whiteboard, and whether the team is presenting it. */
 export const isPresenting = (s) => s > B + 0.05 && s < STOPS.experienceStart - 0.7;
 export const boardIndex = (s) => Math.min(3, Math.max(0, Math.round(s - STOPS.projectsStart)));
@@ -207,17 +200,18 @@ const boardShot = (i) => {
   const drift = (i - 1.5) * 0.35;
   return { pos: [2.6 + drift, 4.4, 1.8], look: [drift * 0.4, 1.9, WHITEBOARD.z], offset: 1 };
 };
-// A slow sideways tracking shot along the path, framed on the monolith just risen.
-const pathShot = (k) => {
-  const x = PATH.xs[k];
-  return { pos: [x + 2.6, 2.4, PATH.z + 12], look: [x + 0.3, 1.7, PATH.z], offset: 1 };
+// Looking down at the open book over the reader's shoulder; drifts a little per chapter.
+const bookShot = (k) => {
+  const drift = (k - (JOBS - 1) / 2) * 0.35;
+  const { x, z, table } = BOOK;
+  return { pos: [x + 1.5 + drift, table + 4.5, z + 5.1], look: [x + 0.45 + drift * 0.3, table - 0.1, z - 0.25], offset: 1, mobileZoom: 1.75, mobileOffset: 1.25 };
 };
 
 const CAMERA_KEYS = [
   // mobileZoom: how far phones pull back (default 1.5×); the wide office needs less on a narrow screen.
   { pos: [2.5, 14.5, 23.5], look: [1, 0.2, -3.6], offset: 0, mobileZoom: 0.52 },
   ...[0, 1, 2, 3].map(boardShot),
-  ...PATH.xs.map((_, k) => pathShot(k)),
+  ...Array.from({ length: JOBS }, (_, k) => bookShot(k)),
   // On phones the contact panel covers the lower half, so lift the scene above it.
   { pos: [0, 2.9, 8.6], look: [0, 1.6, HERO.z], offset: 0, mobileOffset: 0.9 },
 ];

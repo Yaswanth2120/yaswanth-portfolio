@@ -332,35 +332,3 @@ export function drawSketchBoard(ctx, w, h) {
   sketchBox(ctx, 180, 190, 90, 60, 53, 0.35);
   text(ctx, "v3", 225, 230, serif(30), 1, "center");
 }
-
-/**
- * Face of an experience monolith (360 × 765), set out like an engraved stone:
- * milestone number, then company, role, dates and place.
- */
-export function drawMonolithFace(ctx, w, h, index) {
-  const items = content.experience.items;
-  const item = items[index] ?? items[0];
-  ctx.fillStyle = PORCELAIN;
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = ink(0.35);
-  ctx.lineWidth = 2;
-  ctx.strokeRect(14, 14, w - 28, h - 28);
-
-  text(ctx, "MILESTONE", 40, 76, mono(17), 0.5);
-  text(ctx, pad(index + 1), 34, 230, serif(160, 400), 1);
-  line(ctx, 40, 276, w - 40, 276, 0.6, 2);
-
-  ctx.font = serif(46, 500);
-  const name = wrap(ctx, item.org, w - 80).slice(0, 3);
-  name.forEach((l, n) => fitText(ctx, l, 40, 344 + n * 50, (sz) => serif(sz, 500), 46, w - 80, 1));
-  let y = 344 + name.length * 50 + 16;
-  ctx.font = mono(19);
-  wrap(ctx, item.role, w - 80).forEach((l) => {
-    text(ctx, l, 40, y, mono(19), 0.85);
-    y += 28;
-  });
-
-  line(ctx, 40, h - 150, 110, h - 150, 0.6, 2);
-  text(ctx, item.period, 40, h - 108, mono(18), 1);
-  text(ctx, item.place.toUpperCase(), 40, h - 70, mono(14), 0.5);
-}

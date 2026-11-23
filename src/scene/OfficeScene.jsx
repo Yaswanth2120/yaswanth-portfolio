@@ -8,14 +8,15 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { scroll } from "@/lib/scroll";
 import {
-  AGENTS, DESKS, HERO, JOBS, MONOLITH, PATH, PRESENTERS, STOPS, WHITEBOARD, ZONES, ZONE_SCREEN, monolithRise, walkerOpacity, walkerTarget, zoneSlot, zoneToWorld,
+  AGENTS, BOOK, DESKS, HERO, LEAVES, PRESENTERS, STOPS, WHITEBOARD, ZONES, ZONE_SCREEN, leafTurn, zoneSlot, zoneToWorld,
   boardIndex, cameraAt, clamp01, damp, heroOpacity, isPresenting, mix,
   fanIn, peopleOpacity, personTarget, smoothRange, worldOpacity,
 } from "./choreography";
 import { ICON_WORLD_H, ICON_WORLD_W, createPictogramTextures } from "./pictogram";
+import { PAGE_H, PAGE_W, blankPage, bookPage, isLivePage } from "./book";
 import { FUTURE_SCREENS, agentCardHeight, drawAgentCard, drawLiveScreen, drawProjectBoard, liveProjectAt } from "./demos";
 import {
-  DESK_SCREENS, OXBLOOD, PORCELAIN, drawMonolithFace, drawServerRack, drawSketchBoard,
+  DESK_SCREENS, OXBLOOD, PORCELAIN, drawServerRack, drawSketchBoard,
 } from "./screens";
 
 // ---------- materials & geometry helpers ----------
@@ -519,196 +520,147 @@ function ServerRoom({ fill, line }) {
   );
 }
 
-// ---------- experience: the walk ----------
+// ---------- experience: the book ----------
 const E = STOPS.experienceStart;
+const BOOK_TOP = BOOK.table + 0.03 + 0.05; // table top + back board + page block
+const SEGMENTS = 18; // across the page width, for the curl as it turns
 
-/** Invisible porcelain ground under the plain, so monoliths can rise out of the floor. */
-function Ground() {
-  const geo = useMemo(() => {
-    const g = new THREE.PlaneGeometry(40, 16);
-    g.rotateX(-Math.PI / 2);
-    g.translate(0, -0.004, PATH.z);
-    return g;
-  }, []);
-  const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: PORCELAIN }), []);
-  useEffect(() => () => mat.dispose(), [mat]);
-  return <mesh geometry={geo} material={mat} renderOrder={-1} />;
+/** A page plane lying flat (facing +y, top toward -z), spanning x = 0 … W from the spine. */
+function leafGeometry(w, h, back) {
+  const g = new THREE.PlaneGeometry(w, h, SEGMENTS, 1);
+  g.rotateX(-Math.PI / 2);
+  if (back) g.rotateZ(Math.PI); // the other side of the sheet: faces -y, reads correctly once turned
+  g.translate(w / 2, back ? -0.0012 : 0.0012, 0);
+  g.userData.base = Float32Array.from(g.attributes.position.array);
+  return g;
 }
 
-function Monolith({ index, fill, line }) {
-  const draw = useMemo(() => (ctx, w, h) => drawMonolithFace(ctx, w, h, index), [index]);
-  const surface = useSurface(360, 765, draw, false);
-  const { w, h, d } = MONOLITH;
-  const geo = useMemo(() => boxGeo(w, h, d, 0, h / 2, 0), [w, h, d]);
-  const face = useMemo(() => new THREE.PlaneGeometry(w - 0.06, h - 0.06), [w, h]);
-  const group = useRef(null);
+/** Bend a leaf upward toward its outer edge while it turns (0 = flat). */
+function curl(g, w, bend) {
+  const pos = g.attributes.position;
+  const base = g.userData.base;
+  for (let v = 0; v < pos.count; v++) {
+    const x = base[v * 3];
+    pos.setY(v, base[v * 3 + 1] + bend * (x / w) ** 2);
+  }
+  pos.needsUpdate = true;
+}
+
+function usePage(n) {
+  const draw = bookPage(n) ?? blankPage;
+  const live = isLivePage(n);
+  return useSurface(PAGE_W, PAGE_H, draw, live, live ? "book" : null);
+}
+
+/** One sheet: front page (2i) seen on the right, back page (2i + 1) on the left once turned. */
+function Leaf({ index }) {
+  const isCover = index === 0;
+  const w = BOOK.pageW + (isCover ? 0.05 : 0);
+  const h = BOOK.pageH + (isCover ? 0.08 : 0);
+  const front = usePage(2 * index);
+  const back = usePage(2 * index + 1);
+  const frontGeo = useMemo(() => leafGeometry(w, h, false), [w, h]);
+  const backGeo = useMemo(() => leafGeometry(w, h, true), [w, h]);
+  const pivot = useRef(null);
+  const last = useRef(-1);
+
   useFrame(() => {
-    const g = group.current;
+    const g = pivot.current;
     if (!g) return;
-    const rise = monolithRise(index, currentStop());
-    g.visible = rise > 0.001;
-    g.position.set(PATH.xs[index], -h * (1 - rise), PATH.z); // rises out of the ground
+    const turn = leafTurn(index, currentStop());
+    // Stack order: unturned leaves on the right (first on top), turned ones on the left (latest on top).
+    const yRight = BOOK_TOP + (LEAVES - index) * 0.004;
+    const yLeft = BOOK_TOP + index * 0.004;
+    g.position.set(BOOK.x, mix(yRight, yLeft, turn), BOOK.z);
+    g.rotation.z = turn * Math.PI;
+    if (turn !== last.current) {
+      last.current = turn;
+      const bend = isCover ? 0 : Math.sin(turn * Math.PI) * 0.32;
+      curl(frontGeo, w, bend);
+      curl(backGeo, w, bend);
+    }
   });
+
   return (
-    <group ref={group}>
-      <Outlined geo={geo} fill={fill} line={line} />
-      <mesh geometry={face} material={surface.mat} position={[0, h / 2, d / 2 + 0.006]} />
+    <group ref={pivot}>
+      <mesh geometry={frontGeo} material={front.mat} />
+      <mesh geometry={backGeo} material={back.mat} />
     </group>
   );
 }
 
-/** The trail: faint road ahead, a solid line drawn behind the walker, ticks at each milestone. */
-function Trail({ line }) {
-  const faint = useMemo(() => new THREE.LineBasicMaterial({ color: OXBLOOD, transparent: true, opacity: 0.2 }), []);
-  useEffect(() => () => faint.dispose(), [faint]);
-  const z = PATH.z + 0.75; // the line the walker follows
-  const road = useMemo(() => {
-    const pts = [PATH.from, 0.01, z, PATH.to, 0.01, z];
-    PATH.xs.forEach((x) => pts.push(x, 0.01, z - 0.25, x, 0.01, z + 0.25));
+/** The writing table, the book's boards and page blocks, a ribbon, a pen and an inkwell. */
+function BookSet({ fill, line }) {
+  const { x, z, table, pageW, pageH } = BOOK;
+  const geo = useMemo(() => {
+    const parts = [
+      boxGeo(4.6, 0.06, 3.1, x + 0.2, table - 0.03, z), // table top
+      boxGeo(2 * pageW + 0.14, 0.03, pageH + 0.12, x, table + 0.015, z), // back board
+      boxGeo(pageW, 0.05, pageH - 0.02, x - pageW / 2, table + 0.055, z), // left page block
+      boxGeo(pageW, 0.05, pageH - 0.02, x + pageW / 2, table + 0.055, z), // right page block
+    ];
+    for (const [lx, lz] of [[-2.05, -1.4], [2.45, -1.4], [-2.05, 1.4], [2.45, 1.4]]) {
+      parts.push(boxGeo(0.07, table - 0.06, 0.07, x + lx, (table - 0.06) / 2, z + lz));
+    }
+    // fountain pen, lying at an angle beside the book
+    const pen = new THREE.CylinderGeometry(0.03, 0.022, 0.95, 10);
+    pen.rotateZ(Math.PI / 2);
+    pen.rotateY(0.45);
+    pen.translate(x + 2.05, table + 0.03, z + 0.35);
+    parts.push(pen);
+    const nib = new THREE.ConeGeometry(0.022, 0.12, 8);
+    nib.rotateZ(Math.PI / 2);
+    nib.rotateY(0.45);
+    nib.translate(x + 2.05 - Math.cos(0.45) * 0.53, table + 0.03, z + 0.35 + Math.sin(0.45) * 0.53);
+    parts.push(nib);
+    parts.push(cylGeo(0.13, 0.15, 0.16, 12, x + 2.1, table + 0.08, z - 0.8)); // inkwell
+    parts.push(cylGeo(0.06, 0.06, 0.05, 10, x + 2.1, table + 0.185, z - 0.8));
+    return merge(parts);
+  }, [x, z, table, pageW, pageH]);
+
+  // A ribbon bookmark: lies across the right page and hangs over the bottom edge.
+  const ribbon = useMemo(() => {
     const g = new THREE.BufferGeometry();
+    const y0 = BOOK_TOP + 0.03;
+    const rx = x + 0.07;
+    const z0 = z + pageH * 0.2;
+    const z1 = z + pageH / 2 + 0.02;
+    const w2 = 0.018;
+    const pts = [
+      [rx - w2, y0, z0], [rx + w2, y0, z0], [rx + w2, y0, z1],
+      [rx - w2, y0, z0], [rx + w2, y0, z1], [rx - w2, y0, z1],
+      [rx - w2, y0, z1], [rx + w2, y0, z1], [rx + w2 + 0.04, table + 0.0, z1 + 0.18],
+      [rx - w2, y0, z1], [rx + w2 + 0.04, table + 0.0, z1 + 0.18], [rx - w2 + 0.04, table + 0.0, z1 + 0.18],
+    ].flat();
     g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
     return g;
-  }, [z]);
-  const drawn = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.Float32BufferAttribute([PATH.from, 0.012, z, PATH.from, 0.012, z], 3));
-    return g;
-  }, [z]);
-  const head = useRef(null);
-  const headGeo = useMemo(() => {
-    const g = new THREE.CircleGeometry(0.09, 20);
-    g.rotateX(-Math.PI / 2);
-    return g;
-  }, []);
-  const headMat = useMemo(() => new THREE.MeshBasicMaterial({ color: OXBLOOD, transparent: true }), []);
-  useEffect(() => () => headMat.dispose(), [headMat]);
-
+  }, [x, z, table, pageH]);
+  const ribbonMat = useMemo(() => new THREE.MeshBasicMaterial({ color: OXBLOOD, transparent: true, side: THREE.DoubleSide }), []);
+  useEffect(() => () => ribbonMat.dispose(), [ribbonMat]);
   useFrame(() => {
-    const s = currentStop();
-    const w = walkerTarget(s);
-    const x = w.x;
-    const pos = drawn.attributes.position;
-    pos.setX(1, x);
-    pos.needsUpdate = true;
-    if (head.current) head.current.position.set(x, 0.014, z);
-    headMat.opacity = w.onPath ? line.opacity : 0;
+    ribbonMat.opacity = fill.opacity;
   });
 
   return (
     <>
-      <lineSegments geometry={road} material={faint} />
-      <lineSegments geometry={drawn} material={line} />
-      <mesh ref={head} geometry={headGeo} material={headMat} />
+      <Outlined geo={geo} fill={fill} line={line} />
+      <mesh geometry={ribbon} material={ribbonMat} />
     </>
   );
 }
 
-/** Slow rings breathing out from the base of the current monolith. */
-function Pulse() {
-  const geo = useMemo(() => {
-    const g = new THREE.RingGeometry(0.97, 1, 72);
-    g.rotateX(-Math.PI / 2);
-    return g;
-  }, []);
-  const mats = useMemo(
-    () => [0, 1].map(() => new THREE.MeshBasicMaterial({ color: OXBLOOD, transparent: true, depthWrite: false })),
-    []
-  );
-  useEffect(() => () => mats.forEach((m) => m.dispose()), [mats]);
-  const rings = useRef([]);
-  useFrame((three) => {
-    const s = currentStop();
-    const k = Math.min(JOBS - 1, Math.max(0, Math.round(s - E)));
-    const settled = monolithRise(k, s) >= 1 && s < E + JOBS - 0.6;
-    const time = scroll.reduced ? 0.4 : three.clock.elapsedTime;
-    rings.current.forEach((ring, n) => {
-      if (!ring) return;
-      const f = (time / 3.2 + n * 0.5) % 1;
-      ring.position.set(PATH.xs[k], 0.008, PATH.z);
-      ring.scale.setScalar(1.1 + f * 3.2);
-      mats[n].opacity = settled ? (1 - f) * 0.45 : 0;
-    });
-  });
-  return mats.map((m, n) => <mesh key={n} ref={(el) => void (rings.current[n] = el)} geometry={geo} material={m} />);
-}
-
-/** You, walking the path: walks between milestones, gestures to each when you arrive. */
-function Walker({ icons }) {
-  const group = useRef(null);
-  const flip = useRef(null);
-  const material = useMemo(() => iconMaterial(icons.solid.stand), [icons]);
-  useEffect(() => () => material.dispose(), [material]);
-  const state = useRef({ x: PATH.from, z: PATH.z + 0.75, speed: 0, walk: 0, phase: 0, dir: 1, init: false });
-  const right = useMemo(() => new THREE.Vector3(), []);
-
-  useFrame((three, delta) => {
-    const g = group.current;
-    if (!g) return;
-    const s = currentStop();
-    const op = walkerOpacity(s);
-    material.opacity = op;
-    g.visible = op > 0.001;
-    if (!g.visible) return;
-    const dt = Math.min(delta, 0.05);
-    const target = walkerTarget(s);
-    const p = state.current;
-    let vx = 0;
-    let vz = 0;
-    if (!p.init || scroll.reduced || dt <= 0) {
-      p.x = target.x;
-      p.z = target.z;
-      p.walk = 0;
-      p.init = true;
-    } else {
-      const nx = damp(p.x, target.x, 4, dt);
-      const nz = damp(p.z, target.z, 4, dt);
-      vx = (nx - p.x) / dt;
-      vz = (nz - p.z) / dt;
-      p.speed = damp(p.speed, Math.hypot(vx, vz), 8, dt);
-      p.x = nx;
-      p.z = nz;
-      p.walk = damp(p.walk, clamp01((p.speed - 0.12) / 0.6), 6, dt);
-      p.phase += Math.min(p.speed, 3) * dt * 3.4;
-    }
-    right.setFromMatrixColumn(three.camera.matrixWorld, 0);
-    const screenDir = vx * right.x + vz * right.z;
-    if (Math.abs(screenDir) > 0.05) p.dir = screenDir >= 0 ? 1 : -1;
-
-    let pose = "stand";
-    if (p.walk > 0.35) pose = Math.floor(p.phase / Math.PI) % 2 ? "walkB" : "walkA";
-    else if (target.onPath && target.atStop && s >= E - 0.05) pose = "point"; // gestures to his milestone
-    material.map = icons.solid[pose];
-    if (flip.current) flip.current.scale.x = pose.startsWith("walk") ? p.dir : 1;
-
-    const bob = Math.abs(Math.sin(p.phase)) * 0.05 * p.walk;
-    g.position.set(p.x, bob, p.z);
-    g.scale.setScalar(0.9);
-    faceCamera(g, three.camera, p.x, p.z);
-  });
-
-  return (
-    <group ref={group}>
-      <group ref={flip}>
-        <mesh geometry={getIconPlane()} material={material} />
-      </group>
-    </group>
-  );
-}
-
-/** The whole experience scene; only shown from the end of the projects onwards. */
-function TheWalk({ fill, line }) {
+/** The experience scene; only shown from the end of the projects onwards. */
+function TheBook({ fill, line }) {
   const group = useRef(null);
   useFrame(() => {
     if (group.current) group.current.visible = currentStop() > E - 1.2;
   });
   return (
     <group ref={group}>
-      <Ground />
-      {PATH.xs.map((_, k) => (
-        <Monolith key={k} index={k} fill={fill} line={line} />
+      <BookSet fill={fill} line={line} />
+      {Array.from({ length: LEAVES }, (_, i) => (
+        <Leaf key={i} index={i} />
       ))}
-      <Trail line={line} />
-      <Pulse />
     </group>
   );
 }
@@ -839,7 +791,8 @@ function SurfaceUpdater({ mats, mobile, world }) {
     }
 
     // Wall screens (home) and the final fan: smooth playback while in view.
-    const playing = s < 0.6 ? "zone" : s > STOPS.end - 0.5 ? "finale" : null;
+    const playing =
+      s < 0.6 ? "zone" : s > STOPS.end - 0.5 ? "finale" : s > E - 0.6 && s < STOPS.end - 0.5 ? "book" : null;
     if (playing && !scroll.reduced && now - t.zoneDraw > (mobile ? 0.2 : 0.1)) {
       t.zoneDraw = now;
       surfaces.forEach((sf) => {
@@ -966,14 +919,13 @@ function World({ mobile, selected, onSelect }) {
         {ZONES.map((_, i) => (
           <ZoneScreen key={i} index={i} fill={mats.worldFill} line={mats.worldLine} />
         ))}
-        <TheWalk fill={mats.worldFill} line={mats.worldLine} />
+        <TheBook fill={mats.worldFill} line={mats.worldLine} />
         <ServerRoom fill={mats.worldFill} line={mats.worldLine} />
         {!mobile && <Plants fill={mats.worldFill} line={mats.worldLine} />}
       </group>
       {DESKS.map((_, i) => (
         <Person key={i} index={i} icons={icons} selected={selected?.index === i} onSelect={onSelect} />
       ))}
-      <Walker icons={icons} />
       <Hero icons={icons} />
       <HeroDesk fill={mats.heroFill} line={mats.heroLine} />
       <FinaleScreens />
