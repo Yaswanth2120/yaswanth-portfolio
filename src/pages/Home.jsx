@@ -1,49 +1,226 @@
-const projects = [
-  { title: "Veya AI", description: "Whisper transcription, document RAG, and Ollama LLM inference — grounded response generation with voice activity detection and JSONL IPC, all running locally.", stack: ["SwiftUI", "Python", "Whisper", "Ollama", "VAD"], kind: "voice" },
-  { title: "Intelligent\nAPI Gateway", description: "A distributed API gateway with JWT authentication, Redis rate limiting, circuit breakers, request tracing, and React-based monitoring.", stack: ["Java", "Spring Cloud Gateway", "Redis", "React"], kind: "gateway" },
-  { title: "DocuIntel AI", description: "A multi-user RAG platform — document ingestion, embeddings, vector retrieval, contextual prompt construction, grounded generation, and access isolation.", stack: ["FastAPI", "LangChain", "OpenAI", "ChromaDB", "Supabase"], kind: "rag" },
-  { title: "DeployGuard AI", description: "A deployment intelligence platform that asynchronously compares software releases and generates regression and deployment-risk signals.", stack: ["FastAPI", "Spring Boot", "RabbitMQ", "PostgreSQL", "Next.js"], kind: "deploy" },
-];
+import { lazy, Suspense, useEffect, useState } from "react";
+import { content } from "@/data/content";
+import { measureScrollStop, scroll } from "@/lib/scroll";
 
-const experience = [
-  ["Agile Technologies", "Software Engineer", "Mar 2026 — Present", "Virginia, US"],
-  ["Auburn University", "Graduate Research Assistant", "Jan 2025 — Aug 2025", "Montgomery, AL"],
-  ["ITC Infotech", "Software Developer", "Jul 2022 — Nov 2023", "Kolkata, India"],
-  ["SoftSuave Technologies", "Software Engineering Intern", "May 2021 — Jun 2022", "Bangalore, India"],
-];
+const OfficeScene = lazy(() => import("@/scene/OfficeScene"));
+const pad = (n) => String(n).padStart(2, "0");
 
-function Diagram({ kind }) {
-  if (kind === "voice") return <div className="diagram voice"><div className="wave">{Array.from({ length: 24 }, (_, index) => <i key={index} style={{ height: `${14 + ((index * 17) % 47)}px`, animationDelay: `-${(index % 7) * .14}s` }} />)}</div><span>AUDIO → SEGMENTS → TOKENS</span></div>;
-  if (kind === "gateway") return <div className="diagram gateway"><svg viewBox="0 0 680 210" aria-hidden="true"><path d="M15 105H282M374 105H655M375 105L602 20M375 105L602 190" /><path className="route-pulse pulse-a" d="M15 105H282M374 105L602 20" /><path className="route-pulse pulse-b" d="M15 105H282M374 105L602 190" /><circle className="gateway-core" cx="329" cy="105" r="47" /><circle className="gateway-in" cx="15" cy="105" r="8" /><circle className="gateway-out" cx="615" cy="20" r="8" /></svg><span>AUTH · RATE LIMIT · ROUTE</span></div>;
-  if (kind === "rag") return <div className="diagram rag"><svg viewBox="0 0 680 240" aria-hidden="true"><path d="M42 118L210 24M42 118L195 150M42 118L443 172M42 210H658" /><path className="retrieval-path" d="M42 118L210 24" /><path className="retrieval-path delayed" d="M42 118L443 172" /><circle className="query-node" cx="42" cy="118" r="10" />{[[210, 24], [195, 150], [300, 75], [443, 172], [570, 55], [615, 196], [420, 45]].map(([x, y], index) => <rect className={`rag-node node-${index}`} key={index} x={x} y={y} width="16" height="16" />)}</svg><span>QUERY</span></div>;
-  return <div className="diagram deploy"><svg viewBox="0 0 700 235" aria-hidden="true"><path d="M12 118H274C370 118 408 40 580 40H685M274 118C388 118 401 196 685 196" /><path className="compare-line" d="M12 118H274C370 118 408 40 580 40H685" /><path className="compare-line lower" d="M274 118C388 118 401 196 685 196" /><circle className="risk-node" cx="535" cy="121" r="8" /></svg><span>R1 / R2</span><b>Δ RISK SIGNAL</b></div>;
+function Header() {
+  const { logo, nav, email } = content.header;
+  return (
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/90">
+      <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-5 md:px-12">
+        <a href="#top" className="font-serif text-2xl font-medium tracking-tight text-primary">
+          {logo}
+        </a>
+        <nav className="flex items-center gap-5 md:gap-10">
+          {nav.map((item) => (
+            <a key={item.href} href={item.href} className="label-mono link-line text-primary/70 hover:text-primary">
+              {item.label}
+            </a>
+          ))}
+          <a href={`mailto:${email}`} className="label-mono link-line hidden normal-case tracking-normal text-primary lg:inline">
+            {email}
+          </a>
+        </nav>
+      </div>
+    </header>
+  );
 }
 
-const go = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+/** Each [data-stop] section is one point on the 3D scroll timeline. */
+function Stop({ id, children }) {
+  return (
+    <section data-stop id={id} className="flex min-h-svh items-end px-4 pb-6 pt-20 md:items-center md:px-12 md:pb-0">
+      {children}
+    </section>
+  );
+}
+
+function Panel({ children }) {
+  return <div className="reveal panel pointer-events-auto w-full max-w-lg p-6 md:p-10">{children}</div>;
+}
+
+function useReveal() {
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll(".reveal"));
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.target.setAttribute("data-visible", String(e.isIntersecting))),
+      { threshold: 0.2 }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+}
+
+function Story() {
+  useReveal();
+  const { intro, projects, experience, education, contact } = content;
+
+  return (
+    <main className="pointer-events-none relative z-10">
+      <section data-stop id="top" className="flex min-h-svh flex-col justify-end px-5 pb-[8vh] pt-24 md:px-12">
+        <h1 className="font-serif text-[clamp(3.4rem,10.5vw,11.5rem)] font-light leading-[0.86] tracking-[-0.02em] text-primary">
+          {intro.name}
+        </h1>
+        <div className="mt-8 flex flex-col gap-6 md:mt-10 md:flex-row md:items-end md:justify-between">
+          <p className="font-mono text-sm tracking-[0.42em] text-primary md:text-base">{intro.role}</p>
+          <p className="label-mono hidden text-primary/35 md:block">{intro.scrollHint} ↓</p>
+        </div>
+      </section>
+
+      <div id="projects">
+        {projects.items.map((project, i) => (
+          <Stop key={project.name}>
+            <Panel>
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="label-mono text-primary/70">
+                  {projects.eyebrow} — {pad(i + 1)} / {pad(projects.items.length)}
+                </p>
+                {project.badge && <p className="label-mono text-primary">{project.badge}</p>}
+              </div>
+              <h2 className="mt-4 font-serif text-5xl font-light leading-[0.95] md:mt-6 md:text-7xl">{project.name}</h2>
+              <p className="mt-4 leading-relaxed text-primary/70 md:text-lg">{project.summary}</p>
+              <ul className="mt-6 flex flex-wrap gap-2">
+                {project.stack.map((tech) => (
+                  <li key={tech} className="label-mono border border-border px-2.5 py-1.5 text-primary">
+                    {tech}
+                  </li>
+                ))}
+              </ul>
+              <a href={project.github} target="_blank" rel="noreferrer" className="btn-line mt-7">
+                {projects.linkLabel} <span aria-hidden="true">↗</span>
+              </a>
+            </Panel>
+          </Stop>
+        ))}
+      </div>
+
+      <div id="experience">
+        {experience.items.map((job, i) => (
+          <Stop key={job.org}>
+            <Panel>
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="label-mono text-primary/70">
+                  {experience.eyebrow} — {pad(i + 1)} / {pad(experience.items.length)}
+                </p>
+                <p className="label-mono text-right text-primary">{job.period}</p>
+              </div>
+              <h2 className="mt-4 font-serif text-5xl font-light leading-[0.95] md:mt-6 md:text-7xl">{job.org}</h2>
+              <p className="mt-3 font-mono text-sm tracking-wide text-primary">{job.role}</p>
+              <p className="label-mono mt-2 text-primary/35">{job.place}</p>
+              {job.summary && <p className="mt-4 leading-relaxed text-primary/70 md:text-lg">{job.summary}</p>}
+              {i === experience.items.length - 1 && (
+                <div className="mt-6 space-y-3 border-t border-border pt-5">
+                  <p className="label-mono text-primary/70">Education</p>
+                  {education.map((ed) => (
+                    <div key={ed.degree}>
+                      <p className="font-serif text-xl leading-tight">{ed.degree}</p>
+                      <p className="text-sm text-primary/70">
+                        {ed.school} · {ed.period}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+          </Stop>
+        ))}
+      </div>
+
+      {/* Last stop: the merged figure at his desk, with a compact inverted contact panel below. */}
+      <section data-stop id="contact" className="flex min-h-svh flex-col justify-end px-4 pb-6 pt-24 md:px-12 md:pb-10">
+        <div className="reveal pointer-events-auto grid gap-8 bg-primary p-6 text-background md:grid-cols-[1.4fr_1fr] md:items-end md:p-12">
+          <div>
+            <p className="label-mono text-background/70">{contact.eyebrow}</p>
+            <h2 className="mt-4 font-serif text-4xl font-light leading-[0.98] md:text-6xl">{contact.heading}</h2>
+            <a
+              href={`mailto:${contact.email}`}
+              className="link-line mt-5 inline-block break-all font-serif text-2xl decoration-background/35 hover:decoration-background md:text-3xl"
+            >
+              {contact.email}
+            </a>
+          </div>
+          <div className="flex flex-col gap-6 md:items-end">
+            <div className="flex flex-wrap gap-3">
+              {contact.links.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target={link.href.startsWith("http") ? "_blank" : undefined}
+                  rel="noreferrer"
+                  className={link.primary ? "btn-key-inverse" : "btn-line-inverse"}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+            <p className="label-mono text-background/50">{contact.footer}</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
 
 export const Home = () => {
-  const [activeProject, setActiveProject] = useState(0);
-  const stepRefs = useRef([]);
+  const [env, setEnv] = useState(null);
+  // { index, clicks }: clicking the same agent again advances to its next feature.
+  const [selected, setSelected] = useState(null);
+  const selectAgent = (index) =>
+    setSelected((prev) => (index === null ? null : { index, clicks: prev?.index === index ? prev.clicks + 1 : 0 }));
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => entries.forEach((entry) => {
-        if (entry.isIntersecting) setActiveProject(Number(entry.target.dataset.projectIndex));
-      }),
-      { threshold: 0.55 }
-    );
-
-    stepRefs.current.forEach((step) => step && observer.observe(step));
-    return () => observer.disconnect();
+    const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onEnv = () => {
+      scroll.mobile = mobileQuery.matches;
+      scroll.reduced = motionQuery.matches;
+      setEnv({ mobile: mobileQuery.matches, reduced: motionQuery.matches });
+    };
+    const onScroll = () => {
+      scroll.s = measureScrollStop();
+      scroll.listeners.forEach((fn) => fn());
+      // Role cards only exist on the home screen; close one once the visitor scrolls on.
+      if (scroll.s > 0.45) setSelected(null);
+    };
+    onEnv();
+    onScroll();
+    mobileQuery.addEventListener("change", onEnv);
+    motionQuery.addEventListener("change", onEnv);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      mobileQuery.removeEventListener("change", onEnv);
+      motionQuery.removeEventListener("change", onEnv);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, []);
 
-  return <main>
-    <header><button onClick={() => go("top")}>YSV.</button><nav><button onClick={() => go("projects")}>Projects</button><button onClick={() => go("experience")}>Experience</button><button onClick={() => go("about")}>About</button></nav><a href="mailto:yaswanthsai2120@gmail.com">yaswanthsai2120@gmail.com ↗</a></header>
-    <section id="top" className="intro"><div className="intro-signal" aria-hidden="true"><i /><i /><i /><i /><i /></div><p className="mono">SOFTWARE ENGINEER</p><h1>Yaswanth<br />Sai Venkatesan</h1><div className="intro-meta"><p>Virginia, US</p><p>Selected work · experience · education</p><button onClick={() => go("projects")}>SCROLL ↓</button></div></section>
-    <section id="projects" className="projects"><div className="project-stage"><div className="project-guide" aria-hidden="true" />{projects.map((project, projectIndex) => <article className={`project-case ${activeProject === projectIndex ? "is-active" : ""}`} key={project.title} aria-hidden={activeProject !== projectIndex}><span className="project-marker" aria-hidden="true">0{projectIndex + 1}</span><div className="project-copy"><div className="case-meta"><span>0{projectIndex + 1}</span>{projectIndex === 0 && <span>649 AUTOMATED TESTS</span>}</div><h2>{project.title.split("\n").map((line, lineIndex) => <span key={line}>{line}{lineIndex === 0 && project.title.includes("\n") && <br />}</span>)}</h2><p className="description">{project.description}</p><p className="stack">{project.stack.join(" · ")}</p><a href="https://github.com/Yaswanth2120" target="_blank" tabIndex={activeProject === projectIndex ? 0 : -1}>VIEW ON GITHUB ↗</a></div><Diagram kind={project.kind} /></article>)}</div><div className="project-scroll-steps" aria-hidden="true">{projects.map((project, projectIndex) => <div className="project-scroll-step" data-project-index={projectIndex} key={project.title} ref={(element) => { stepRefs.current[projectIndex] = element; }} />)}</div></section>
-    <section id="experience" className="experience"><p className="mono">EXPERIENCE</p><div>{experience.map(([company, role, period, place], index) => <article key={company}><span>0{index + 1}</span><div><h2>{company}</h2><p>{role}</p></div><p>{period}<br />{place}</p></article>)}</div></section>
-    <section id="about" className="about"><p className="mono">EDUCATION / SKILLS</p><div className="about-grid"><div><h2>Master of Science in Computer Science</h2><p>Auburn University at Montgomery<br />Jan 2024 — Dec 2025</p><h2>Bachelor of Technology in Electrical and Electronics Engineering</h2><p>National Institute of Technology Mizoram<br />Aug 2018 — May 2022</p></div><div><h3>Languages</h3><p>Python · Java · SQL · JavaScript</p><h3>AI / ML</h3><p>LLMs · RAG · Prompt Engineering · Guardrails · LangChain · Whisper · PyTorch · Scikit-learn · OpenCV</p><h3>Backend / Data</h3><p>FastAPI · Spring Boot · PostgreSQL · Redis · Kafka · RabbitMQ</p><h3>Cloud / DevOps</h3><p>AWS · GCP · Docker · Kubernetes · Jenkins · GitHub Actions</p></div></div></section>
-    <footer id="contact"><span>YASWANTH SAI VENKATESAN</span><a href="mailto:yaswanthsai2120@gmail.com">yaswanthsai2120@gmail.com</a><span className="flags" aria-label="United States and India">🇺🇸&nbsp; 🇮🇳</span></footer>
-  </main>;
+  useEffect(() => {
+    if (selected === null) return;
+    const onKey = (e) => e.key === "Escape" && setSelected(null);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected]);
+
+  return (
+    <div className="relative bg-background text-foreground">
+      {env && (
+        <Suspense fallback={null}>
+          {/* Remount the scene when the device class or motion preference changes. */}
+          <OfficeScene
+            key={`${env.mobile}-${env.reduced}`}
+            mobile={env.mobile}
+            reduced={env.reduced}
+            selected={selected}
+            onSelect={selectAgent}
+          />
+        </Suspense>
+      )}
+      <Header />
+      <Story />
+    </div>
+  );
 };
-import { useEffect, useRef, useState } from "react";
