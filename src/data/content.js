@@ -115,6 +115,7 @@ export const content = {
         role: "Software Developer",
         period: "Jul 2022 — Nov 2023",
         place: "Kolkata, India",
+        tools: ["Spring Boot", "REST APIs", "Kafka", "RabbitMQ", "SQL tuning", "Jenkins", "Docker"],
         summary:
           "Spring Boot microservices and REST APIs, Kafka and RabbitMQ messaging, SQL tuning, and Jenkins + Docker delivery pipelines.",
       },
@@ -123,6 +124,7 @@ export const content = {
         role: "Graduate Research Assistant",
         period: "Jan 2025 — Aug 2025",
         place: "Montgomery, AL",
+        tools: ["YOLOv5", "PyTorch", "Edge inference", "Cloud offload", "Benchmarking"],
         summary:
           "Real-time object detection pipelines with YOLOv5 and PyTorch across edge and cloud, cutting inference latency by 35%.",
       },
@@ -131,6 +133,8 @@ export const content = {
         role: "Software Engineer",
         period: "Mar 2026 — Present",
         place: "Cottonwood, AZ",
+        // TODO: confirm; these are placeholders until there's a summary for this role.
+        tools: ["Agents", "LLM systems", "APIs", "Interfaces"],
       },
     ],
   },

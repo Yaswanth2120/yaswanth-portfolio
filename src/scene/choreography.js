@@ -204,7 +204,7 @@ const boardShot = (i) => {
 const bookShot = (k) => {
   const drift = (k - (JOBS - 1) / 2) * 0.35;
   const { x, z, table } = BOOK;
-  return { pos: [x + 1.5 + drift, table + 4.5, z + 5.1], look: [x + 0.45 + drift * 0.3, table - 0.1, z - 0.25], offset: 1, mobileZoom: 1.75, mobileOffset: 1.25 };
+  return { pos: [x + 1.4 + drift, table + 4.0, z + 4.5], look: [x + 0.45 + drift * 0.3, table - 0.05, z - 0.2], offset: 1, mobileZoom: 1.75, mobileOffset: 1.25 };
 };
 
 const CAMERA_KEYS = [
