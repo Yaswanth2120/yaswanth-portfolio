@@ -10,11 +10,12 @@ import { scroll } from "@/lib/scroll";
 import {
   AGENTS, BOOK, DESKS, HERO, LEAVES, PRESENTERS, STOPS, WHITEBOARD, ZONES, ZONE_SCREEN, leafTurn, zoneSlot, zoneToWorld,
   boardIndex, cameraAt, clamp01, damp, heroOpacity, isPresenting, mix,
-  fanIn, peopleOpacity, personTarget, smoothRange, worldOpacity,
+  fanIn, peopleOpacity, personTarget, worldOpacity,
 } from "./choreography";
 import { ICON_WORLD_H, ICON_WORLD_W, createPictogramTextures } from "./pictogram";
 import { PAGE_H, PAGE_W, blankPage, bookPage, isLivePage } from "./book";
-import { FUTURE_SCREENS, agentCardHeight, drawAgentCard, drawLiveScreen, drawProjectBoard, liveProjectAt } from "./demos";
+import { FUTURE_SCREENS, agentCardHeight, drawAgentCard, drawLiveScreen, liveProjectAt } from "./demos";
+import { BOARD_H, BOARD_W, drawPlotterBoard, plotterPen } from "./plotter";
 import {
   DESK_SCREENS, OXBLOOD, PORCELAIN, drawServerRack, drawSketchBoard,
 } from "./screens";
@@ -442,38 +443,110 @@ function Plants({ fill, line }) {
 }
 
 // The whiteboard plays a live demo of the project currently being presented.
-// Between two project stops the next demo wipes in, driven by scroll.
-const boardState = { from: 0, to: 0, progress: 0 };
-const drawBoardAt = (ctx, w, h, t) =>
-  drawProjectBoard(ctx, w, h, boardState.from, boardState.to, boardState.progress, t);
+// ---------- the drawing machine (projects) ----------
+// A wall-mounted pen plotter: two motors at the top corners, a pen holder hung
+// on two cords. It draws each project's diagram live; when you move on, the
+// sheet rolls up and it starts the next one.
+const plotter = { current: 0, previous: -1, changedAt: 0, started: false, lastDraw: 0 };
+const drawPlotterAt = (ctx, w, h) => {
+  const elapsed = scroll.reduced ? 999 : plotter.now - plotter.changedAt;
+  drawPlotterBoard(ctx, w, h, plotter.current, scroll.reduced ? -1 : plotter.previous, elapsed);
+};
 
 function Whiteboard({ fill, line }) {
-  const surface = useSurface(1024, 490, drawBoardAt, false, "board");
+  const surface = useSurface(BOARD_W, BOARD_H, drawPlotterAt, false, "board");
   const { width, height } = WHITEBOARD;
+  const top = WHITEBOARD.y + height / 2;
+  const motorY = top + 0.38;
+  const motorX = width / 2 + 0.12;
   const geo = useMemo(
     () =>
       merge([
         boxGeo(width + 0.1, height + 0.1, 0.05, 0, WHITEBOARD.y, 0),
-        boxGeo(0.05, WHITEBOARD.y + height / 2 + 0.2, 0.05, -width / 2 + 0.2, (WHITEBOARD.y + height / 2 + 0.2) / 2, -0.05),
-        boxGeo(0.05, WHITEBOARD.y + height / 2 + 0.2, 0.05, width / 2 - 0.2, (WHITEBOARD.y + height / 2 + 0.2) / 2, -0.05),
+        boxGeo(0.05, motorY + 0.3, 0.05, -width / 2 + 0.2, (motorY + 0.3) / 2, -0.05),
+        boxGeo(0.05, motorY + 0.3, 0.05, width / 2 - 0.2, (motorY + 0.3) / 2, -0.05),
         boxGeo(0.7, 0.04, 0.5, -width / 2 + 0.2, 0.02, -0.05),
         boxGeo(0.7, 0.04, 0.5, width / 2 - 0.2, 0.02, -0.05),
-        boxGeo(1.2, 0.04, 0.12, 0, WHITEBOARD.y - height / 2 - 0.05, 0.05),
+        boxGeo(width + 0.5, 0.06, 0.08, 0, motorY + 0.3, -0.02), // top beam
+        boxGeo(0.26, 0.26, 0.2, -motorX, motorY, 0.08), // left motor
+        boxGeo(0.26, 0.26, 0.2, motorX, motorY, 0.08), // right motor
+        cylGeo(0.07, 0.07, 0.06, 12, -motorX, motorY, 0.2), // spools
+        cylGeo(0.07, 0.07, 0.06, 12, motorX, motorY, 0.2),
+        boxGeo(width * 0.9, 0.1, 0.12, 0, top + 0.08, 0.04), // paper roll housing
       ]),
-    [width, height]
+    [width, height, top, motorX, motorY]
   );
   const plane = useMemo(() => new THREE.PlaneGeometry(width, height * 0.98), [width, height]);
-  // Only during projects: hidden behind the home-screen office, and from the
-  // tower's side (experience) we'd only see its blank back.
+  const gondolaGeo = useMemo(() => {
+    const body = cylGeo(0.11, 0.11, 0.06, 16, 0, 0, 0);
+    body.rotateX(Math.PI / 2);
+    return merge([body, boxGeo(0.03, 0.03, 0.12, 0, 0, 0.06)]);
+  }, []);
+  const cords = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(new Array(12).fill(0), 3));
+    return g;
+  }, []);
   const group = useRef(null);
-  useFrame(() => {
+  const gondola = useRef(null);
+  const pen = useRef({ x: 0, y: 0 });
+
+  // Only during projects: hidden behind the home-screen office, and from the
+  // experience side we'd only see its blank back.
+  useFrame((three, delta) => {
     const s = currentStop();
-    if (group.current) group.current.visible = s > 0.25 && s < STOPS.experienceStart - 0.35;
+    const visible = s > 0.25 && s < STOPS.experienceStart - 0.35;
+    if (group.current) group.current.visible = visible;
+    if (!visible) return;
+    const now = three.clock.elapsedTime;
+    plotter.now = now;
+    const index = boardIndex(s);
+    if (!plotter.started) {
+      plotter.started = true;
+      plotter.current = index;
+      plotter.previous = -1;
+      plotter.changedAt = now;
+    } else if (index !== plotter.current) {
+      // Roll the current sheet up (finished or not) and start the next drawing.
+      plotter.previous = plotter.current;
+      plotter.current = index;
+      plotter.changedAt = now;
+    }
+
+    // Redraw the sheet ~24× a second while it's in view.
+    if (scroll.reduced ? plotter.lastDraw === 0 || index !== plotter.lastIndex : now - plotter.lastDraw > 1 / 24) {
+      plotter.lastDraw = now;
+      plotter.lastIndex = index;
+      surface.draw(surface.ctx, surface.w, surface.h, now);
+      surface.tex.needsUpdate = true;
+    }
+
+    // The pen holder follows the pen; the cords run from each motor to it.
+    const elapsed = scroll.reduced ? 999 : now - plotter.changedAt;
+    const p = plotterPen(plotter.current, scroll.reduced ? -1 : plotter.previous, elapsed);
+    const tx = (p.x / BOARD_W - 0.5) * width;
+    const ty = WHITEBOARD.y + (0.5 - p.y / BOARD_H) * height * 0.98;
+    const dt = Math.min(delta, 0.05);
+    pen.current.x = damp(pen.current.x, tx, 18, dt);
+    pen.current.y = damp(pen.current.y, ty, 18, dt);
+    const z = 0.1 + (p.down ? 0 : 0.05);
+    if (gondola.current) gondola.current.position.set(pen.current.x, pen.current.y, z);
+    const pos = cords.attributes.position;
+    pos.setXYZ(0, -motorX, motorY, 0.2);
+    pos.setXYZ(1, pen.current.x, pen.current.y, z);
+    pos.setXYZ(2, motorX, motorY, 0.2);
+    pos.setXYZ(3, pen.current.x, pen.current.y, z);
+    pos.needsUpdate = true;
   });
+
   return (
     <group ref={group} position={[WHITEBOARD.x, 0, WHITEBOARD.z]}>
       <Outlined geo={geo} fill={fill} line={line} />
       <mesh geometry={plane} material={surface.mat} position={[0, WHITEBOARD.y, 0.03]} />
+      <lineSegments geometry={cords} material={line} />
+      <group ref={gondola}>
+        <Outlined geo={gondolaGeo} fill={fill} line={line} />
+      </group>
     </group>
   );
 }
@@ -721,11 +794,8 @@ function CameraRig({ mobile }) {
   return null;
 }
 
-// A moment late in each demo's loop, used as the still frame.
-const BOARD_STILL_T = 8.8;
-
 function SurfaceUpdater({ mats, mobile, world }) {
-  const track = useRef({ redraw: 0, board: -1, boardDraw: 0, zoneDraw: 0 });
+  const track = useRef({ redraw: 0, zoneDraw: 0 });
   const invalidate = useThree((st) => st.invalidate);
 
   useEffect(() => {
@@ -734,7 +804,7 @@ function SurfaceUpdater({ mats, mobile, world }) {
     document.fonts?.ready.then(() => {
       if (!alive) return;
       surfaces.forEach((sf) => {
-        sf.draw(sf.ctx, sf.w, sf.h, sf.kind === "board" ? BOARD_STILL_T : 0);
+        sf.draw(sf.ctx, sf.w, sf.h, 0);
         sf.tex.needsUpdate = true;
       });
       invalidate();
@@ -770,25 +840,6 @@ function SurfaceUpdater({ mats, mobile, world }) {
 
     const t = track.current;
     const now = three.clock.elapsedTime;
-
-    // Whiteboard demo: smooth playback while the projects are on screen; a still
-    // frame otherwise (and always, with reduced motion).
-    const board = boardIndex(s);
-    const live = !scroll.reduced && s > 0.3 && s < STOPS.experienceStart + 0.2;
-    if (board !== t.board || (live && now - t.boardDraw > (mobile ? 0.15 : 1 / 14))) {
-      t.board = board;
-      t.boardDraw = now;
-      const p = Math.min(3, Math.max(0, s - STOPS.projectsStart));
-      boardState.from = Math.min(3, Math.floor(p));
-      boardState.to = Math.min(3, boardState.from + 1);
-      boardState.progress = scroll.reduced ? 0 : smoothRange(0.25, 0.75, p - boardState.from);
-      if (scroll.reduced) boardState.from = board;
-      surfaces.forEach((sf) => {
-        if (sf.kind !== "board") return;
-        sf.draw(sf.ctx, sf.w, sf.h, live ? now : BOARD_STILL_T);
-        sf.tex.needsUpdate = true;
-      });
-    }
 
     // Wall screens (home) and the final fan: smooth playback while in view.
     const playing =
