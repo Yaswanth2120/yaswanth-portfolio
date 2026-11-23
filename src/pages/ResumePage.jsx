@@ -1,39 +1,23 @@
-import { Link } from "react-router-dom"
-import { ArrowLeft } from "lucide-react"
-import { portfolio } from "@/data/portfolio";
+import { Link } from "react-router-dom";
+
+const RESUME_FILE = "/Yaswanth_Resume.pdf";
 
 function ResumePage() {
   return (
-    <div className="min-h-screen bg-background pt-24 text-foreground">
-      <div className="container mx-auto px-4">
-        <Link
-          to="/"
-          className="mb-6 inline-flex items-center text-primary transition-colors hover:text-primary/80"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Portfolio
-        </Link>
-        <div className="w-full rounded-[28px] border border-border/70 bg-card/80 p-4 shadow-[0_28px_80px_-46px_rgba(15,23,42,0.7)]">
-          <iframe
-            src={portfolio.links.resumeFile}
-            width="100%"
-            height="900px"
-            style={{ border: "none" }}
-            title="Resume"
-            className="rounded-2xl bg-background"
-          />
-
-          <a
-            href={portfolio.links.resumeFile}
-            download
-            className="mt-4 inline-block text-primary hover:underline"
-          >
-            Download Resume
+    <div className="min-h-screen bg-background px-5 pb-12 pt-10 text-foreground md:px-12">
+      <div className="mx-auto max-w-[1100px]">
+        <div className="mb-6 flex items-center justify-between">
+          <Link to="/" className="label-mono link-line">
+            ← Back to portfolio
+          </Link>
+          <a href={RESUME_FILE} download className="btn-key">
+            Download
           </a>
         </div>
+        <iframe src={RESUME_FILE} title="Resume" className="h-[85vh] w-full border border-border bg-background" />
       </div>
     </div>
-  )
+  );
 }
 
 export default ResumePage;
