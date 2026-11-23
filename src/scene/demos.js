@@ -51,57 +51,93 @@ function header(ctx, w, index, caption) {
   line(ctx, 40, 72, w - 40, 72, 0.15, 2);
 }
 
-// ---------- 01 Veya AI: voice → transcript → retrieval → local answer ----------
-function veya(ctx, w, h, t) {
-  const T = t % 10;
-  header(ctx, w, 0, "LIVE · LOCAL VOICE ASSISTANT");
+// ---------- 01 Feather AI: quantize → benchmark → check quality → evidence ----------
+// Figures are Feather AI's measured results: Qwen2.5-Coder-0.5B on an Apple M2 (8 GiB).
+const VARIANTS = [
+  { name: "F16", speed: 1, mem: 1590, diff: null },
+  { name: "Q8_0", speed: 1.47, mem: 899, diff: -0.28 },
+  { name: "Q4_K_M", speed: 1.77, mem: 721, diff: -0.83 },
+];
+function feather(ctx, w, h, t) {
+  const T = t % 11;
+  header(ctx, w, 0, "LIVE · LOCAL QUANTIZATION LAB");
+  text(ctx, "QWEN2.5-CODER-0.5B · APPLE M2", 40, 104, mono(14), 0.55);
 
-  // Microphone + voice activity detection
-  const speaking = T < 3;
-  block(ctx, 40, 110, 230, 230, "AUDIO · VAD", speaking);
-  for (let i = 0; i < 22; i++) {
-    const amp = speaking ? 0.2 + 0.8 * Math.abs(Math.sin(i * 0.7 + t * 7) * Math.sin(i * 1.3 + t * 3.1)) : 0.06;
-    const bh = amp * 120;
-    ctx.fillStyle = ink(speaking ? 1 : 0.35);
-    ctx.fillRect(58 + i * 9, 225 - bh / 2, 5, bh);
-  }
-  text(ctx, speaking ? "● speech detected" : "○ silence", 56, 320, mono(14), speaking ? 1 : 0.35);
-
-  // Whisper transcription
-  arrow(ctx, 278, 225, 318, 225);
-  if (T > 2.6 && T < 3.2) dot(ctx, lerp(278, 318, seg(T, 2.6, 3.2)), 225);
-  const transcribing = T >= 3 && T < 5;
-  block(ctx, 326, 110, 250, 230, "WHISPER", transcribing);
-  ctx.font = mono(17);
-  wrap(ctx, typed("“what's on my calendar tomorrow?”", T, 3.1, 4.6), 220).forEach((l, n) =>
-    text(ctx, l, 342, 180 + n * 26, mono(17), 1)
-  );
-
-  // Retrieval
-  arrow(ctx, 584, 225, 624, 225);
-  if (T > 4.6 && T < 5.1) dot(ctx, lerp(584, 624, seg(T, 4.6, 5.1)), 225);
-  const retrieving = T >= 5 && T < 6.2;
-  block(ctx, 632, 110, 180, 230, "RAG · DOCS", retrieving);
-  ["notes.md", "calendar.ics", "mail.txt"].forEach((name, k) => {
-    const hit = k === 1 && T >= 5.3;
-    box(ctx, 650, 150 + k * 58, 144, 42, hit ? 1 : 0.35, hit ? 0.1 : 0);
-    text(ctx, name, 662, 177 + k * 58, mono(14), hit ? 1 : 0.5);
+  // 1 · quantize: the F16 source becomes two smaller variants
+  block(ctx, 40, 122, 170, 64, "F16 SOURCE", T < 1.6);
+  text(ctx, "1590 MiB", 56, 172, mono(15), 1);
+  VARIANTS.slice(1).forEach((v, n) => {
+    const y = 214 + n * 86;
+    const f = ease(seg(T, 0.6 + n * 0.5, 1.4 + n * 0.5));
+    if (f <= 0) return;
+    arrow(ctx, 125, 190, 125, y - 4, 0.6 * f);
+    box(ctx, 40, y, 170 * (0.6 + 0.4 * f), 56, f, 0.04 * f);
+    text(ctx, v.name, 56, y + 25, mono(15), f);
+    text(ctx, `${v.mem} MiB`, 56, y + 45, mono(14), 0.7 * f);
   });
 
-  // Local LLM
-  arrow(ctx, 820, 225, 856, 225);
-  if (T > 6 && T < 6.4) dot(ctx, lerp(820, 856, seg(T, 6, 6.4)), 225);
-  const thinking = T >= 6.2 && T < 6.8;
-  block(ctx, 864, 110, 120, 230, "OLLAMA", T >= 6.2);
-  if (thinking) for (let k = 0; k < 3; k++) dot(ctx, 900 + k * 20, 230, 5, Math.floor(t * 6 + k) % 3 === 0 ? 1 : 0.3);
-  if (T >= 6.8) text(ctx, "llama3", 880, 230, mono(15), 0.7);
+  // 2 · benchmark: decode speed and peak memory, relative to F16
+  const bx = 250;
+  const bw = 330;
+  text(ctx, "DECODE SPEED", bx, 136, mono(14), 0.7);
+  text(ctx, "PEAK MEMORY", bx, 296, mono(14), 0.7);
+  VARIANTS.forEach((v, n) => {
+    const grow = ease(seg(T, 2 + n * 0.35, 3.2 + n * 0.35));
+    const ys = 152 + n * 36;
+    text(ctx, v.name, bx, ys + 18, mono(13), 0.8);
+    box(ctx, bx + 80, ys + 4, bw - 80, 18, 0.2);
+    ctx.fillStyle = ink(n === 2 ? 1 : 0.4);
+    ctx.fillRect(bx + 80, ys + 4, (bw - 80) * (v.speed / 1.9) * grow, 18);
+    if (grow >= 1) text(ctx, `×${v.speed.toFixed(2)}`, bx + bw + 8, ys + 18, mono(13), 1);
+    const grow2 = ease(seg(T, 3.4 + n * 0.35, 4.6 + n * 0.35));
+    const ym = 312 + n * 36;
+    text(ctx, v.name, bx, ym + 18, mono(13), 0.8);
+    box(ctx, bx + 80, ym + 4, bw - 80, 18, 0.2);
+    ctx.fillStyle = ink(n === 2 ? 1 : 0.4);
+    ctx.fillRect(bx + 80, ym + 4, (bw - 80) * (v.mem / 1700) * grow2, 18);
+    if (grow2 >= 1) text(ctx, `${v.mem}`, bx + bw + 8, ym + 18, mono(13), 1);
+  });
 
-  // Answer
-  box(ctx, 40, 370, 944, 86, 0.35, 0.04);
-  text(ctx, "›", 58, 422, mono(24), 1);
-  const answer = "Tomorrow: 10:00 stand-up and 14:00 design review — from calendar.ics";
-  text(ctx, typed(answer, T, 6.8, 9.2), 86, 420, mono(18), 1);
-  if (T < 6.8) text(ctx, "waiting for a question…", 86, 420, mono(18), 0.35);
+  // 3 · quality: paired difference vs F16 must sit inside the pre-registered ±10 pp margin
+  const qx = 676;
+  const qw = 308;
+  block(ctx, qx, 122, qw, 290, "QUALITY · CODING-V2", T > 5 && T < 9);
+  const axisY = 300;
+  const px = (pp) => qx + qw / 2 + (pp / 14) * (qw / 2 - 20);
+  ctx.fillStyle = ink(0.08);
+  ctx.fillRect(px(-10), 170, px(10) - px(-10), 190);
+  line(ctx, px(-10), 170, px(-10), 360, 0.5, 1.5);
+  line(ctx, px(10), 170, px(10), 360, 0.5, 1.5);
+  line(ctx, px(0), 176, px(0), 354, 0.25, 1);
+  line(ctx, qx + 20, axisY + 70, qx + qw - 20, axisY + 70, 0.5, 1.5);
+  text(ctx, "−10 pp", px(-10), 392, mono(12), 0.6, "center");
+  text(ctx, "+10 pp", px(10), 392, mono(12), 0.6, "center");
+  text(ctx, "margin", px(0), 166, mono(12), 0.5, "center");
+  VARIANTS.slice(1).forEach((v, n) => {
+    const f = ease(seg(T, 5.4 + n * 0.8, 6.2 + n * 0.8));
+    if (f <= 0) return;
+    const y = 230 + n * 70;
+    const cx = px(v.diff * f);
+    line(ctx, cx - 34, y, cx + 34, y, f, 2); // confidence interval
+    line(ctx, cx - 34, y - 7, cx - 34, y + 7, f, 2);
+    line(ctx, cx + 34, y - 7, cx + 34, y + 7, f, 2);
+    dot(ctx, cx, y, 6, f);
+    text(ctx, `${v.name}  ${v.diff.toFixed(2)} pp`, qx + 20, y - 16, mono(13), f);
+  });
+  if (T > 7.4) text(ctx, "within margin ✓", qx + 20, 404, mono(14), 1);
+
+  // 4 · evidence, not a promise
+  if (T > 8) {
+    box(ctx, 40, 428, 944, 40, 1, 1);
+    ctx.font = mono(15);
+    ctx.fillStyle = PORCELAIN;
+    ctx.textAlign = "left";
+    ctx.fillText(
+      typed("Q4_K_M · 1.77× decode · 55% less memory · no detectable coding loss — tested, not assumed", T, 8, 10),
+      56,
+      454
+    );
+  }
 }
 
 // ---------- 02 API Gateway: auth, rate limits, routing, circuit breaker ----------
@@ -303,7 +339,7 @@ function deployguard(ctx, w, h, t) {
   text(ctx, "errors 2.1× · /checkout · 3 services", 40, 466, mono(14), seg(T, 6.4, 7));
 }
 
-const DEMOS = [veya, gateway, docuintel, deployguard];
+const DEMOS = [feather, gateway, docuintel, deployguard];
 
 function drawDemo(ctx, w, h, index, t) {
   paper(ctx, w, h, false);

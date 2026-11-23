@@ -76,12 +76,12 @@ export const content = {
     linkLabel: "View on GitHub",
     items: [
       {
-        name: "Veya AI",
-        badge: "649 automated tests",
+        name: "Feather AI",
+        badge: "1.77× faster decode",
         summary:
-          "Whisper transcription, document RAG, and Ollama LLM inference — grounded response generation with voice activity detection and JSONL IPC, all running locally.",
-        stack: ["SwiftUI", "Python", "Whisper", "Ollama", "VAD"],
-        github: `${GITHUB}/Veya`,
+          "A local-first lab for quantizing LLMs — creates Q8/Q4 variants, benchmarks speed and memory, evaluates quality in a sandbox, and recommends only configurations it has actually tested.",
+        stack: ["Python", "FastAPI", "llama.cpp", "React", "SQLite"],
+        github: `${GITHUB}/FeatherAI`,
       },
       {
         name: "Intelligent API Gateway",
