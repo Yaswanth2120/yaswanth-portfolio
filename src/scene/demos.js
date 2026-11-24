@@ -1,6 +1,6 @@
 // Canvas drawings for the scene's screens: agent cards, the live-project wall
 // screens in the office, and the final fan of "where AI is heading" screens.
-// draw*(ctx, w, h, t) with t = seconds. (Project diagrams live in plotter.js.)
+// draw*(ctx, w, h, t) with t = seconds. (Project models live in systems.js.)
 import { content } from "@/data/content";
 import { box, fitText, ink, line, mono, pad, paper, serif, sketchBox, sketchLine, text, wrap, PORCELAIN } from "./screens";
 

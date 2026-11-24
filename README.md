@@ -9,7 +9,7 @@ A scroll-driven 3D portfolio drawn entirely in two colours: porcelain and oxbloo
 | Section | What happens |
 | --- | --- |
 | **Home** | A curved office with three project zones. Each zone has a wall screen showing a live project (AgentReplay, InferencePilot, KernelForge), and the projects rotate across the screens. Click a person at a desk to see the feature they're working on; click again for the next one. |
-| **Projects** | Half the team gathers at a wall-mounted drawing machine (a pen plotter hung on two cords) in front of a server room. It draws each project's system diagram live, stroke by stroke, then data starts flowing along the arrows it drew. Scroll on and the sheet rolls up for the next one: Feather AI, Intelligent API Gateway, DocuIntel AI and DeployGuard AI. |
+| **Projects** | The model floor. Each project builds itself as a working miniature on the floor in front of the server room: components rise one by one, tracks are laid between them, then data packets run through. Requests over the rate limit bounce back at the gateway, and DeployGuard's risky release queues up at its gate. Half the team works around the model. Scroll on and the system sinks into the floor while the next one builds: Feather AI, Intelligent API Gateway, DocuIntel AI and DeployGuard AI. |
 | **Experience** | A clothbound book on a writing table opens as you arrive. Each role is a chapter: the left page holds the numeral, years and tools, and the right page holds an animated figure of the work. Pages turn as you scroll. The current chapter is still being written. |
 | **Contact** | The team merges into one figure at a desk, with five screens about where AI is heading fanned out above. The inverted oxblood contact panel sits below. |
 
@@ -54,11 +54,11 @@ src/
   pages/Home.jsx         Page sections (one per scroll stop) and the scroll tracking
   lib/scroll.js          Shared scroll position (a fractional "stop" index) read by the scene
   scene/
-    OfficeScene.jsx      The 3D scene: office, people, drawing machine, server room, book, final desk
+    OfficeScene.jsx      The 3D scene: office, people, model floor, server room, book, final desk
     choreography.js      Timeline: where everyone is, camera keys and fades at each scroll stop
     pictogram.js         The 2D people (poses drawn to canvas textures)
     screens.js           Drawing helpers, desk-monitor screens, server-rack lights
-    plotter.js           The drawing machine: each project's diagram as a timed pen path
+    systems.js           The model floor: each project's system as nodes and links
     demos.js             Live-project wall screens, agent cards, final screens
     book.js              The experience book's pages and animated figures
 public/
@@ -69,7 +69,7 @@ public/
 
 Most edits only touch `src/data/content.js`:
 
-- **Projects:** `projects.items` holds 4 entries. Each project's diagram is defined in `src/scene/plotter.js` (the `DIAGRAMS` array, in the same order) as boxes, arrows and text that the machine draws in sequence.
+- **Projects:** `projects.items` holds 4 entries. Each project's model is defined in `src/scene/systems.js` (the `SYSTEMS` array, in the same order) as nodes (services, stores, gates, models…) and the links packets travel along.
 - **Live projects:** `liveProjects` holds 3 entries (one office zone each), with the features shown when you click a person.
 - **Experience:** `experience.items`. If you change how many roles there are, also update `JOBS` in `src/scene/choreography.js`. Each role's book figure is in `src/scene/book.js` (`FIGURES`).
 
