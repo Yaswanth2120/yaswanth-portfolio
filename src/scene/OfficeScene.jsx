@@ -8,7 +8,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { scroll } from "@/lib/scroll";
 import {
-  AGENTS, BOOK, CONTACT_CAMERA, DESKS, HERO, MERGED, YOU, LEAVES, STOPS, ZONES, ZONE_SCREEN, leafTurn, zoneSlot, zoneToWorld,
+  AGENTS, BOOK, CONTACT_CAMERA, DESKS, HERO, MERGED, YOU, LEAVES, STOPS, ZONES, ZONE_SCREEN, leavesTurned, smootherstep, zoneSlot, zoneToWorld,
   cameraAt, clamp01, damp, heroOpacity, mix, projectIndex, smoothRange,
   fanIn, peopleOpacity, personTarget, worldOpacity,
 } from "./choreography";
@@ -848,7 +848,7 @@ function Leaf({ index }) {
   useFrame(() => {
     const g = pivot.current;
     if (!g) return;
-    const turn = leafTurn(index, currentStop());
+    const turn = smootherstep(pages.turned - index);
     // Stack order: unturned leaves on the right (first on top), turned ones on the left (latest on top).
     const yRight = BOOK_TOP + (LEAVES - index) * 0.004;
     const yLeft = BOOK_TOP + index * 0.004;
@@ -930,8 +930,24 @@ function BookSet({ fill, line }) {
   );
 }
 
+// How many leaves are turned right now (fractional while one is turning). It
+// moves toward leavesTurned(s) at about a second per leaf, so each turn plays
+// in full once you've arrived; a long jump (e.g. from the nav) goes faster.
+const pages = { turned: 0 };
+const SECONDS_PER_LEAF = 1.05;
+
 /** The experience book: always on its table at the back of the office. */
 function TheBook({ fill, line }) {
+  useFrame((_, delta) => {
+    const target = leavesTurned(currentStop(), scroll.mobile);
+    if (scroll.reduced) {
+      pages.turned = target;
+      return;
+    }
+    const diff = target - pages.turned;
+    const step = (Math.max(1, Math.abs(diff) * 0.6) / SECONDS_PER_LEAF) * Math.min(delta, 0.05);
+    pages.turned = Math.abs(diff) <= step ? target : pages.turned + Math.sign(diff) * step;
+  });
   return (
     <group>
       <BookSet fill={fill} line={line} />

@@ -214,15 +214,22 @@ export const fanIn = (i, s) => smoothRange(M + 0.62 + i * 0.025, M + 0.82 + i * 
 
 // ---------- experience: the book ----------
 /**
- * 0 → 1 as leaf i turns from the right side to the left. The cover and title
- * leaf turn as you arrive; then one leaf per job, between its stop and the next.
+ * Scroll position where the camera has settled over the book and it starts to
+ * open. Later on phones, where the last project's panel covers the top half
+ * (and so the book) until it has scrolled away.
  */
-export function leafTurn(i, s) {
-  if (i === 0) return smoothRange(E - 0.8, E - 0.45, s); // cover opens
-  if (i === 1) return smoothRange(E - 0.45, E - 0.08, s); // title page
-  const k = i - 2; // turning from spread k to k + 1
-  if (k >= JOBS - 1) return 0;
-  return smoothRange(E + k + 0.3, E + k + 0.85, s);
+export const bookOpensAt = (mobile) => E - (mobile ? 0.1 : 0.32);
+/**
+ * How many leaves should be turned at scroll position s. The page turns
+ * themselves play over time (see OfficeScene), not with the scroll, so they're
+ * seen in full however fast you scroll: the book stays shut until the camera
+ * has arrived, then the cover and title page turn; each chapter you reach
+ * turns one more leaf.
+ */
+export function leavesTurned(s, mobile = false) {
+  if (s < bookOpensAt(mobile)) return 0;
+  const chapter = Math.min(JOBS - 1, Math.max(0, Math.round(s) - E));
+  return 2 + chapter;
 }
 
 /** Index of the project being built on the model floor. */
@@ -241,7 +248,15 @@ const modelShot = (i) => {
 const bookShot = (k) => {
   const drift = (k - (JOBS - 1) / 2) * 0.35;
   const { x, z, table } = BOOK;
-  return { pos: [x + 1.4 + drift, table + 4.0, z + 4.5], look: [x + 0.45 + drift * 0.3, table - 0.05, z - 0.2], offset: 1, mobileZoom: 1.75, mobileOffset: 1.25 };
+  return {
+    pos: [x + 1.4 + drift, table + 4.0, z + 4.5],
+    look: [x + 0.45 + drift * 0.3, table - 0.05, z - 0.2],
+    offset: 1,
+    mobileZoom: 1.75,
+    mobileOffset: 1.25,
+    // Coming from the projects, settle over the book early so the opening is seen.
+    arrive: k === 0 ? 0.6 : 1,
+  };
 };
 
 const CAMERA_KEYS = [
@@ -259,7 +274,8 @@ export function cameraAt(s) {
   const last = CAMERA_KEYS.length - 1;
   const t = Math.min(last, Math.max(0, s));
   const i = Math.min(last - 1, Math.floor(t));
-  const f = smootherstep(t - i);
+  const b0 = CAMERA_KEYS[i + 1];
+  const f = smootherstep((t - i) / (b0.arrive ?? 1));
   const a = CAMERA_KEYS[i];
   const b = CAMERA_KEYS[i + 1];
   const lerp3 = (p, q) => [mix(p[0], q[0], f), mix(p[1], q[1], f), mix(p[2], q[2], f)];
