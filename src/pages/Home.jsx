@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { content } from "@/data/content";
 import { measureScrollStop, scroll } from "@/lib/scroll";
+import { STOPS, YOU } from "@/scene/choreography";
 
 const OfficeScene = lazy(() => import("@/scene/OfficeScene"));
 const pad = (n) => String(n).padStart(2, "0");
@@ -181,8 +182,13 @@ export const Home = () => {
     const onScroll = () => {
       scroll.s = measureScrollStop();
       scroll.listeners.forEach((fn) => fn());
-      // Role cards only exist on the home screen; close one once the visitor scrolls on.
-      if (scroll.s > 0.45) setSelected(null);
+      // Agent cards only exist on the home screen, and yours only at the end:
+      // close a card once the visitor scrolls away from it.
+      setSelected((prev) => {
+        if (!prev) return prev;
+        const inPlace = prev.index === YOU ? scroll.s > STOPS.end - 0.35 : scroll.s <= 0.45;
+        return inPlace ? prev : null;
+      });
     };
     onEnv();
     onScroll();

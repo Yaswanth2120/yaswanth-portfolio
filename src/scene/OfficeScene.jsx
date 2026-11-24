@@ -8,7 +8,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { scroll } from "@/lib/scroll";
 import {
-  AGENTS, BOOK, DESKS, HERO, LEAVES, STOPS, ZONES, ZONE_SCREEN, leafTurn, zoneSlot, zoneToWorld,
+  AGENTS, BOOK, CONTACT_CAMERA, DESKS, HERO, MERGED, YOU, LEAVES, STOPS, ZONES, ZONE_SCREEN, leafTurn, zoneSlot, zoneToWorld,
   cameraAt, clamp01, damp, heroOpacity, mix, projectIndex, smoothRange,
   fanIn, peopleOpacity, personTarget, worldOpacity,
 } from "./choreography";
@@ -249,7 +249,7 @@ const HERO_SCALE = 1.6;
 const HERO_DESK_SCALE = 1.45;
 
 /** The single figure everyone merges into, now working at one desk with headphones on. */
-function Hero({ icons }) {
+function Hero({ icons, onSelect }) {
   const group = useRef(null);
   const material = useMemo(() => iconMaterial(icons.hero.typeA), [icons]);
   useEffect(() => () => material.dispose(), [material]);
@@ -265,9 +265,23 @@ function Hero({ icons }) {
     material.opacity = heroOpacity(s);
     faceCamera(g, three.camera, HERO.x, HERO.z);
   });
+  // Click yourself at the end to see what you're building right now.
+  const clickable = () => currentStop() > MERGED - 0.1;
   return (
     <group ref={group} position={[HERO.x, 0, HERO.z]}>
-      <mesh geometry={getIconPlane()} material={material} />
+      <mesh
+        geometry={getIconPlane()}
+        material={material}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (clickable()) onSelect(YOU);
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          if (clickable()) document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={() => (document.body.style.cursor = "")}
+      />
     </group>
   );
 }
@@ -352,7 +366,7 @@ function FinaleScreen({ index }) {
     surface.mat.opacity = t;
     g.visible = t > 0.001;
     g.position.set(x, FAN_Y[index] - (1 - t) * 0.5, z);
-    g.rotation.y = Math.atan2(0 - x, 8.6 - z); // face the closing camera
+    g.rotation.y = Math.atan2(CONTACT_CAMERA[0] - x, CONTACT_CAMERA[2] - z); // face the closing camera
   });
 
   return (
@@ -395,44 +409,58 @@ function SketchBoardFace() {
 }
 
 /** A wall screen above each office zone; the three live projects rotate across them. */
+// The wall screens are motorised: during the projects they lower into a
+// cabinet so the view to the model floor is clear, then rise again after.
+const CABINET_H = 0.9;
+const screenClip = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(CABINET_H + 0.02)); // keeps y > cabinet top
+const screenLift = (s) => smoothRange(0.12, 0.7, s) * (1 - smoothRange(STOPS.experienceStart - 0.9, STOPS.experienceStart - 0.3, s));
+
 function ZoneScreen({ index, fill, line }) {
   const draw = useMemo(() => (ctx, w, h, t) => drawLiveScreen(ctx, w, h, index, t), [index]);
   const surface = useSurface(1024, 490, draw, true, "zone");
   const { y, z, width, height } = ZONE_SCREEN;
+  const top = y + height / 2;
   const geo = useMemo(
     () =>
       merge([
         boxGeo(width + 0.12, height + 0.12, 0.06, 0, y, -0.04),
-        boxGeo(0.06, y + height / 2, 0.06, -width / 2 + 0.3, (y + height / 2) / 2, -0.1),
-        boxGeo(0.06, y + height / 2, 0.06, width / 2 - 0.3, (y + height / 2) / 2, -0.1),
+        boxGeo(0.06, top, 0.06, -width / 2 + 0.3, top / 2, -0.1),
+        boxGeo(0.06, top, 0.06, width / 2 - 0.3, top / 2, -0.1),
       ]),
-    [y, width, height]
+    [y, width, height, top]
   );
+  const cabinet = useMemo(() => boxGeo(width + 0.4, CABINET_H, 0.5, 0, CABINET_H / 2, -0.08), [width]);
   const plane = useMemo(() => new THREE.PlaneGeometry(width, height * 0.98), [width, height]);
   const screenPos = zoneToWorld(ZONES[index], 0, z);
-  // The middle screen stands between the desks and the model floor, so it
-  // fades to a faint outline while the camera looks past it at the projects.
-  const ghosts = index === 1;
-  const mats = useMemo(() => (ghosts ? { fill: fill.clone(), line: line.clone() } : { fill, line }), [ghosts, fill, line]);
+  // Own materials, clipped at the cabinet top so the screen disappears into it.
+  const mats = useMemo(() => {
+    const m = { fill: fill.clone(), line: line.clone() };
+    m.fill.clippingPlanes = [screenClip];
+    m.line.clippingPlanes = [screenClip];
+    return m;
+  }, [fill, line]);
   useEffect(() => {
-    if (!ghosts) return undefined;
-    surface.ghost = (s) => 1 - 0.9 * smoothRange(0.35, 0.85, s) * (1 - smoothRange(E - 0.9, E - 0.4, s));
+    surface.mat.clippingPlanes = [screenClip];
     return () => {
       mats.fill.dispose();
       mats.line.dispose();
     };
-  }, [ghosts, surface, mats]);
+  }, [surface, mats]);
+  const lift = useRef(null);
   useFrame(() => {
-    if (!ghosts) return;
     const s = currentStop();
-    const o = worldOpacity(s) * (surface.ghost ? surface.ghost(s) : 1);
+    const o = worldOpacity(s);
     mats.fill.opacity = o;
     mats.line.opacity = o;
+    if (lift.current) lift.current.position.y = -screenLift(s) * (top - CABINET_H + 0.1);
   });
   return (
     <group position={[screenPos.x, 0, screenPos.z]} rotation={[0, ZONES[index].rot, 0]}>
-      <Outlined geo={geo} fill={mats.fill} line={mats.line} />
-      <mesh geometry={plane} material={surface.mat} position={[0, y, 0.01]} />
+      <Outlined geo={cabinet} fill={fill} line={line} />
+      <group ref={lift}>
+        <Outlined geo={geo} fill={mats.fill} line={mats.line} />
+        <mesh geometry={plane} material={surface.mat} position={[0, y, 0.01]} />
+      </group>
     </group>
   );
 }
@@ -440,7 +468,10 @@ function ZoneScreen({ index, fill, line }) {
 function Plants({ fill, line }) {
   const geo = useMemo(() => {
     // Between and beside the curved zones, plus a couple deeper in the room.
-    const local = [[-5.3, 1.2, 1], [5.3, 1.2, 1], [-5.3, -4.6, 1], [5.3, -4.6, 1], [-5.3, 1.2, 0], [5.3, 1.2, 2]];
+    const local = [
+      [-6.2, 1.9, 1], [6.2, 1.9, 1], [-6.2, -5.6, 1], [6.2, -5.6, 1], [-6.2, 1.9, 0], [6.2, 1.9, 2],
+      [-6.2, -5.6, 0], [6.2, -5.6, 2], [-5.2, 6.2, 0], [5.2, 6.2, 2],
+    ];
     const spots = [
       ...local.map(([dx, dz, zi]) => zoneToWorld(ZONES[zi], dx, dz)).map(({ x, z }) => [x, z]),
     ];
@@ -735,8 +766,8 @@ function ModelFloor({ fill, line }) {
 
 // ---------- server room behind the model floor ----------
 const RACK_ROWS = [
-  { from: -10.6, to: -5.2, z: -15.6 },
-  { from: 5.2, to: 10.6, z: -15.6 },
+  { from: -13.4, to: -6.2, z: -21.8 },
+  { from: 6.2, to: 13.4, z: -21.8 },
 ];
 function ServerRoom({ fill, line }) {
   const leds = useSurface(128, 360, drawServerRack, true); // one animated texture, shared by every rack
@@ -921,7 +952,7 @@ function FloorGrid({ mobile }) {
       mat.depthWrite = false;
     }
   }, []);
-  return <gridHelper ref={ref} args={[80, mobile ? 40 : 80, OXBLOOD, OXBLOOD]} position={[0, 0, -6]} />;
+  return <gridHelper ref={ref} args={[110, mobile ? 55 : 110, OXBLOOD, OXBLOOD]} position={[0, 0, -6]} />;
 }
 
 // ---------- per-frame controllers ----------
@@ -1004,7 +1035,7 @@ function SurfaceUpdater({ mats, mobile, world }) {
     mats.worldFill.opacity = w;
     mats.worldLine.opacity = w;
     surfaces.forEach((sf) => {
-      if (sf.kind === null || sf.kind === "board" || sf.kind === "zone") sf.mat.opacity = w * (sf.ghost ? sf.ghost(s) : 1);
+      if (sf.kind === null || sf.kind === "board" || sf.kind === "zone") sf.mat.opacity = w;
     });
     if (world.current) world.current.visible = w > 0.005;
     const h = heroOpacity(s);
@@ -1045,12 +1076,18 @@ function SurfaceUpdater({ mats, mobile, world }) {
  * Card over the clicked agent's desk: the feature it's working on. Each click on
  * the same agent shows its next feature. Click the card (or anywhere else) to close.
  */
-function DeskCard({ index, clicks, mobile, onClose }) {
+function DeskCard({ index, clicks, mobile, onClose, onNext }) {
   // The agent works on whatever project its zone's screen is showing right now.
   const clock = useThree((st) => st.clock);
+  const you = index === YOU;
+  // You work across all three projects: each click is the next thing being built,
+  // rotating through the projects.
   const info = useMemo(
-    () => ({ agent: index, project: liveProjectAt(DESKS[index].zone, clock.elapsedTime), feature: zoneSlot(index) + clicks }),
-    [index, clicks, clock]
+    () =>
+      you
+        ? { you, project: clicks % 3, feature: Math.floor(clicks / 3) }
+        : { agent: index, project: liveProjectAt(DESKS[index].zone, clock.elapsedTime), feature: zoneSlot(index) + clicks },
+    [you, index, clicks, clock]
   );
   const draw = useMemo(() => (ctx, w, h) => drawAgentCard(ctx, w, h, info), [info]);
   const cardH = useMemo(() => agentCardHeight(880, info), [info]);
@@ -1072,16 +1109,16 @@ function DeskCard({ index, clicks, mobile, onClose }) {
     if (!m) return;
     openedAt.current ??= clock.elapsedTime;
     m.quaternion.copy(camera.quaternion);
-    if (mobile) {
-      // Phones: too narrow to float the card by the desk, so hold it centred in
-      // front of the camera, in the upper half of the screen, at 90% width.
+    if (mobile || you) {
+      // Phones (too narrow to float the card by the desk) and your own card:
+      // held in front of the camera, in the upper part of the screen.
       const dist = 6;
       const visH = 2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
       const visW = visH * (size.width / size.height);
       camera.getWorldDirection(forward);
       up.set(0, 1, 0).applyQuaternion(camera.quaternion);
-      m.position.copy(camera.position).addScaledVector(forward, dist).addScaledVector(up, visH * 0.18);
-      m.scale.setScalar((visW * 0.9) / 2.2);
+      m.position.copy(camera.position).addScaledVector(forward, dist).addScaledVector(up, visH * (you ? (mobile ? 0.12 : 0.29) : 0.2));
+      m.scale.setScalar((visW * (mobile ? 0.9 : 0.34)) / 2.2);
     } else {
       m.position.set(desk.x, 1.8 + (planeH / 2) * 2, desk.z - 0.4);
       m.scale.setScalar(2);
@@ -1097,7 +1134,9 @@ function DeskCard({ index, clicks, mobile, onClose }) {
       renderOrder={20}
       onClick={(e) => {
         e.stopPropagation();
-        onClose();
+        // Your card sits over the figure, so clicking it shows the next message.
+        if (you) onNext();
+        else onClose();
       }}
       onPointerOver={() => (document.body.style.cursor = "pointer")}
       onPointerOut={() => (document.body.style.cursor = "")}
@@ -1106,7 +1145,7 @@ function DeskCard({ index, clicks, mobile, onClose }) {
 }
 
 /** The selected agent's desk card. */
-function SceneLabels({ selected, mobile, onClose }) {
+function SceneLabels({ selected, mobile, onClose, onNext }) {
   return (
     <>
       {selected && (
@@ -1116,6 +1155,7 @@ function SceneLabels({ selected, mobile, onClose }) {
           clicks={selected.clicks}
           mobile={mobile}
           onClose={onClose}
+          onNext={onNext}
         />
       )}
     </>
@@ -1135,7 +1175,7 @@ function World({ mobile, selected, onSelect }) {
   return (
     <>
       <color attach="background" args={[PORCELAIN]} />
-      <fog attach="fog" args={[PORCELAIN, 14, mobile ? 55 : 64]} />
+      <fog attach="fog" args={[PORCELAIN, 16, mobile ? 70 : 82]} />
       <FloorGrid mobile={mobile} />
       <group ref={world}>
         {DESKS.map((_, i) => (
@@ -1152,10 +1192,10 @@ function World({ mobile, selected, onSelect }) {
       {DESKS.map((_, i) => (
         <Person key={i} index={i} icons={icons} selected={selected?.index === i} onSelect={onSelect} />
       ))}
-      <Hero icons={icons} />
+      <Hero icons={icons} onSelect={onSelect} />
       <HeroDesk fill={mats.heroFill} line={mats.heroLine} />
       <FinaleScreens />
-      <SceneLabels selected={selected} mobile={mobile} onClose={() => onSelect(null)} />
+      <SceneLabels selected={selected} mobile={mobile} onClose={() => onSelect(null)} onNext={() => onSelect(YOU)} />
       <CameraRig mobile={mobile} />
       <SurfaceUpdater mats={mats} mobile={mobile} world={world} />
     </>
@@ -1170,6 +1210,9 @@ export default function OfficeScene({ mobile, reduced, selected, onSelect }) {
         flat
         dpr={mobile ? [1, 1.25] : [1, 2]}
         frameloop={reduced ? "demand" : "always"}
+        onCreated={({ gl }) => {
+          gl.localClippingEnabled = true; // the wall screens lower into their cabinets
+        }}
         camera={{ fov: mobile ? 52 : 36, near: 0.1, far: 120, position: [11.5, 8.6, 12.5] }}
         gl={{ antialias: true, powerPreference: mobile ? "low-power" : "high-performance" }}
       >

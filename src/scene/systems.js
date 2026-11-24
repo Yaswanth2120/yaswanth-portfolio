@@ -9,7 +9,7 @@
 // Link options: bounce (packets turn back part-way: rejected), hold (packets
 // queue up before the end: held back).
 
-export const MODEL_FLOOR = { x: 0, z: -11.2, w: 11.2, d: 6 };
+export const MODEL_FLOOR = { x: 0, z: -17, w: 11.2, d: 6 };
 
 /** Seconds: a system sinking away, one node rising, the gap between nodes. */
 export const SINK = 0.5;
