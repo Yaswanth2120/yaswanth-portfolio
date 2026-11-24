@@ -45,10 +45,10 @@ export function agentCardHeight(w, info) {
 }
 
 /**
- * info = { agent, project, feature } (indices). Draws the card and returns the
- * height its content used.
+ * info = { agent, project, feature } (indices), or { you: true, project, feature }
+ * for the final figure. Draws the card and returns the height its content used.
  */
-export function drawAgentCard(ctx, w, h, { agent, project, feature }) {
+export function drawAgentCard(ctx, w, h, { agent, project, feature, you = false }) {
   const proj = content.liveProjects[project];
   const item = proj.features[feature % proj.features.length];
   paper(ctx, w, h, false);
@@ -56,9 +56,9 @@ export function drawAgentCard(ctx, w, h, { agent, project, feature }) {
   ctx.lineWidth = 3;
   ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
 
-  text(ctx, `AGENT ${pad(agent + 1)} · ${proj.name.toUpperCase()}`, 36, 56, mono(20), 0.7);
-  text(ctx, "CLICK AGAIN ↻", w - 36, 56, mono(18), 0.5, "right");
-  text(ctx, "WORKING ON", 36, 104, mono(17), 0.5);
+  const who = you ? "YASWANTH" : `AGENT ${pad(agent + 1)}`;
+  text(ctx, `${who} · ${proj.name.toUpperCase()}`, 36, 56, mono(20), 0.7);
+  text(ctx, you ? "BUILDING RIGHT NOW" : "WORKING ON", 36, 104, mono(17), 0.5);
   fitText(ctx, item.title, 36, 170, (s) => serif(s, 500), 72, w - 72, 1);
   ctx.font = sans(26);
   const lines = wrap(ctx, item.detail, w - 72);

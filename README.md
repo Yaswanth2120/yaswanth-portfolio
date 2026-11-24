@@ -1,6 +1,6 @@
 # Yaswanth Sai Venkatesan — Portfolio
 
-A scroll-driven 3D portfolio drawn entirely in two colours: porcelain and oxblood line art. As you scroll, one continuous scene plays out: an office of people working on live projects, a presentation of finished work, a book of past roles, and a closing desk scene.
+A scroll-driven 3D portfolio drawn entirely in two colours: porcelain and oxblood line art. The whole site is one office. Every part of it is always standing (the desks, the model floor, the server room, the book at the back, the final desk at the front), and each scroll moves the camera to a different part of the office.
 
 **Live:** <https://yaswanthsai-venkatesan.vercel.app>
 
@@ -8,10 +8,10 @@ A scroll-driven 3D portfolio drawn entirely in two colours: porcelain and oxbloo
 
 | Section | What happens |
 | --- | --- |
-| **Home** | A curved office with three project zones. Each zone has a wall screen showing a live project (AgentReplay, InferencePilot, KernelForge), and the projects rotate across the screens. Click a person at a desk to see the feature they're working on; click again for the next one. |
-| **Projects** | The model floor. Each project builds itself as a working miniature on the floor in front of the server room: components rise one by one, tracks are laid between them, then data packets run through. Requests over the rate limit bounce back at the gateway, and DeployGuard's risky release queues up at its gate. Half the team works around the model. Scroll on and the system sinks into the floor while the next one builds: Feather AI, Intelligent API Gateway, DocuIntel AI and DeployGuard AI. |
-| **Experience** | A clothbound book on a writing table opens as you arrive. Each role is a chapter: the left page holds the numeral, years and tools, and the right page holds an animated figure of the work. Pages turn as you scroll. The current chapter is still being written. |
-| **Contact** | The team merges into one figure at a desk, with five screens about where AI is heading fanned out above. The inverted oxblood contact panel sits below. |
+| **Home** | A large curved office with three project zones of nine desks each (27 people). Each zone has a wall screen showing a live project (AgentReplay, InferencePilot, KernelForge), and the projects rotate across the screens. Click a person at a desk to see the feature they're working on; click again for the next one. |
+| **Projects** | The wall screens lower into their cabinets to clear the view, and the camera moves to the model floor. Each project builds itself as a working miniature on the floor in front of the server room: components rise one by one, tracks are laid between them, then data packets run through. Requests over the rate limit bounce back at the gateway, and DeployGuard's risky release queues up at its gate. Half the team works around the model. Scroll on and the system sinks into the floor while the next one builds: Feather AI, Intelligent API Gateway, DocuIntel AI and DeployGuard AI. |
+| **Experience** | At the back of the office (visible from every earlier section), a clothbound book on a writing table opens as you arrive. Each role is a chapter: the left page holds the numeral, years and tools, and the right page holds an animated figure of the work. Pages turn as you scroll. The current chapter is still being written. |
+| **Contact** | The camera rises up over the whole office and comes down at the front, where the team merges into one figure at a desk, with five screens about where AI is heading fanned out above. The office stays behind, dimmed. Click the figure to see what Yaswanth is building right now; each click shows the next thing, rotating through the three live projects. The inverted oxblood contact panel sits below. |
 
 Every scene respects `prefers-reduced-motion` (it shows still frames that change per section) and has a lighter mobile version.
 
@@ -82,4 +82,6 @@ Pushing to `main` deploys to production on Vercel. `vercel.json` rewrites every 
 ## Branches
 
 - `main` is the live site, with the "Chapters" book experience.
+- `one-office` makes the whole site one continuous office: every section stays standing and the camera moves between them.
+- `projects-model-floor` is the model-floor projects section on its own.
 - `experience-the-walk` is an alternative experience section, "The Walk": monoliths rise along a path as you walk it.

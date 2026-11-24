@@ -8,8 +8,8 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { scroll } from "@/lib/scroll";
 import {
-  AGENTS, BOOK, DESKS, HERO, LEAVES, STOPS, ZONES, ZONE_SCREEN, leafTurn, zoneSlot, zoneToWorld,
-  cameraAt, clamp01, damp, heroOpacity, mix, projectIndex,
+  AGENTS, BOOK, CONTACT_CAMERA, DESKS, HERO, MERGED, YOU, LEAVES, STOPS, ZONES, ZONE_SCREEN, leavesTurned, smootherstep, zoneSlot, zoneToWorld,
+  cameraAt, clamp01, damp, heroOpacity, mix, projectIndex, smoothRange,
   fanIn, peopleOpacity, personTarget, worldOpacity,
 } from "./choreography";
 import { ICON_WORLD_H, ICON_WORLD_W, createPictogramTextures } from "./pictogram";
@@ -79,15 +79,27 @@ function Outlined({ geo, fill, line, ...props }) {
 // Every surface registers here so the updater can fade and redraw them together.
 const surfaces = new Set();
 
+// Canvas resolution per kind of surface, as a multiple of its drawing size, so
+// text stays sharp on high-density screens where these are seen large (the
+// cards, the final screens, the book). Draw functions keep their logical sizes;
+// the context is scaled. Phones get a bit less to save memory.
+const RESOLUTION = { card: 3, finale: 3, tag: 2.5, zone: 2, book: 2 };
+const resolutionOf = (kind) => {
+  const k = RESOLUTION[kind] ?? 1.5;
+  return scroll.mobile ? Math.max(1, k * 0.7) : k;
+};
+
 function useSurface(width, height, draw, animated, kind = null) {
   const surface = useMemo(() => {
+    const k = resolutionOf(kind);
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = Math.round(width * k);
+    canvas.height = Math.round(height * k);
     const ctx = canvas.getContext("2d");
+    ctx.scale(canvas.width / width, canvas.height / height);
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
+    tex.anisotropy = 8;
     draw(ctx, width, height, 0);
     tex.needsUpdate = true;
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false });
@@ -249,7 +261,7 @@ const HERO_SCALE = 1.6;
 const HERO_DESK_SCALE = 1.45;
 
 /** The single figure everyone merges into, now working at one desk with headphones on. */
-function Hero({ icons }) {
+function Hero({ icons, onSelect }) {
   const group = useRef(null);
   const material = useMemo(() => iconMaterial(icons.hero.typeA), [icons]);
   useEffect(() => () => material.dispose(), [material]);
@@ -265,9 +277,23 @@ function Hero({ icons }) {
     material.opacity = heroOpacity(s);
     faceCamera(g, three.camera, HERO.x, HERO.z);
   });
+  // Click yourself at the end to see what you're building right now.
+  const clickable = () => currentStop() > MERGED - 0.1;
   return (
     <group ref={group} position={[HERO.x, 0, HERO.z]}>
-      <mesh geometry={getIconPlane()} material={material} />
+      <mesh
+        geometry={getIconPlane()}
+        material={material}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (clickable()) onSelect(YOU);
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          if (clickable()) document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={() => (document.body.style.cursor = "")}
+      />
     </group>
   );
 }
@@ -352,7 +378,7 @@ function FinaleScreen({ index }) {
     surface.mat.opacity = t;
     g.visible = t > 0.001;
     g.position.set(x, FAN_Y[index] - (1 - t) * 0.5, z);
-    g.rotation.y = Math.atan2(0 - x, 8.6 - z); // face the closing camera
+    g.rotation.y = Math.atan2(CONTACT_CAMERA[0] - x, CONTACT_CAMERA[2] - z); // face the closing camera
   });
 
   return (
@@ -395,30 +421,58 @@ function SketchBoardFace() {
 }
 
 /** A wall screen above each office zone; the three live projects rotate across them. */
+// The wall screens are motorised: during the projects they lower into a
+// cabinet so the view to the model floor is clear, then rise again after.
+const CABINET_H = 0.9;
+const screenClip = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(CABINET_H + 0.02)); // keeps y > cabinet top
+const screenLift = (s) => smoothRange(0.12, 0.7, s) * (1 - smoothRange(STOPS.experienceStart - 0.9, STOPS.experienceStart - 0.3, s));
+
 function ZoneScreen({ index, fill, line }) {
   const draw = useMemo(() => (ctx, w, h, t) => drawLiveScreen(ctx, w, h, index, t), [index]);
   const surface = useSurface(1024, 490, draw, true, "zone");
   const { y, z, width, height } = ZONE_SCREEN;
+  const top = y + height / 2;
   const geo = useMemo(
     () =>
       merge([
         boxGeo(width + 0.12, height + 0.12, 0.06, 0, y, -0.04),
-        boxGeo(0.06, y + height / 2, 0.06, -width / 2 + 0.3, (y + height / 2) / 2, -0.1),
-        boxGeo(0.06, y + height / 2, 0.06, width / 2 - 0.3, (y + height / 2) / 2, -0.1),
+        boxGeo(0.06, top, 0.06, -width / 2 + 0.3, top / 2, -0.1),
+        boxGeo(0.06, top, 0.06, width / 2 - 0.3, top / 2, -0.1),
       ]),
-    [y, width, height]
+    [y, width, height, top]
   );
+  const cabinet = useMemo(() => boxGeo(width + 0.4, CABINET_H, 0.5, 0, CABINET_H / 2, -0.08), [width]);
   const plane = useMemo(() => new THREE.PlaneGeometry(width, height * 0.98), [width, height]);
   const screenPos = zoneToWorld(ZONES[index], 0, z);
-  const group = useRef(null);
-  // Only on the home screen; afterwards it would block the project whiteboard.
+  // Own materials, clipped at the cabinet top so the screen disappears into it.
+  const mats = useMemo(() => {
+    const m = { fill: fill.clone(), line: line.clone() };
+    m.fill.clippingPlanes = [screenClip];
+    m.line.clippingPlanes = [screenClip];
+    return m;
+  }, [fill, line]);
+  useEffect(() => {
+    surface.mat.clippingPlanes = [screenClip];
+    return () => {
+      mats.fill.dispose();
+      mats.line.dispose();
+    };
+  }, [surface, mats]);
+  const lift = useRef(null);
   useFrame(() => {
-    if (group.current) group.current.visible = currentStop() < 0.5;
+    const s = currentStop();
+    const o = worldOpacity(s);
+    mats.fill.opacity = o;
+    mats.line.opacity = o;
+    if (lift.current) lift.current.position.y = -screenLift(s) * (top - CABINET_H + 0.1);
   });
   return (
-    <group ref={group} position={[screenPos.x, 0, screenPos.z]} rotation={[0, ZONES[index].rot, 0]}>
-      <Outlined geo={geo} fill={fill} line={line} />
-      <mesh geometry={plane} material={surface.mat} position={[0, y, 0.01]} />
+    <group position={[screenPos.x, 0, screenPos.z]} rotation={[0, ZONES[index].rot, 0]}>
+      <Outlined geo={cabinet} fill={fill} line={line} />
+      <group ref={lift}>
+        <Outlined geo={geo} fill={mats.fill} line={mats.line} />
+        <mesh geometry={plane} material={surface.mat} position={[0, y, 0.01]} />
+      </group>
     </group>
   );
 }
@@ -426,7 +480,10 @@ function ZoneScreen({ index, fill, line }) {
 function Plants({ fill, line }) {
   const geo = useMemo(() => {
     // Between and beside the curved zones, plus a couple deeper in the room.
-    const local = [[-5.3, 1.2, 1], [5.3, 1.2, 1], [-5.3, -4.6, 1], [5.3, -4.6, 1], [-5.3, 1.2, 0], [5.3, 1.2, 2]];
+    const local = [
+      [-6.2, 1.9, 1], [6.2, 1.9, 1], [-6.2, -5.6, 1], [6.2, -5.6, 1], [-6.2, 1.9, 0], [6.2, 1.9, 2],
+      [-6.2, -5.6, 0], [6.2, -5.6, 2], [-5.2, 6.2, 0], [5.2, 6.2, 2],
+    ];
     const spots = [
       ...local.map(([dx, dz, zi]) => zoneToWorld(ZONES[zi], dx, dz)).map(({ x, z }) => [x, z]),
     ];
@@ -597,6 +654,8 @@ function SystemModel({ index, fill, line }) {
     else if (index === build.previous && !reduced) up = () => 1 - clamp01(elapsed / SINK);
     else up = () => 0;
     const sinking = index !== build.current;
+    const dim = worldOpacity(currentStop()); // dims with the office at the end
+    packetMat.opacity = dim;
     g.visible = up(system.nodes.length - 1) > 0 || up(0) > 0;
     if (!g.visible) return;
 
@@ -608,7 +667,7 @@ function SystemModel({ index, fill, line }) {
         obj.scale.set(1, Math.max(0.001, sinking ? p : easeOutBack(p)), 1);
       }
       const tag = tagRefs[i].current;
-      if (tag) tag.opacity = clamp01((p - 0.6) / 0.4);
+      if (tag) tag.opacity = clamp01((p - 0.6) / 0.4) * dim;
       const spin = spinner.current[i];
       if (spin) {
         spin.visible = p > 0.001;
@@ -689,15 +748,10 @@ function ModelFloor({ fill, line }) {
   }, [w, d]);
   const group = useRef(null);
 
-  // Only during projects: from the experience side we'd only be in the way.
+  // Always standing in the office: the first project before you reach it,
+  // the last one after you've moved on to the book.
   useFrame((three) => {
     const s = currentStop();
-    const visible = s > 0.25 && s < STOPS.experienceStart - 0.35;
-    if (group.current) group.current.visible = visible;
-    if (!visible) {
-      build.started = false; // rebuild from scratch on the way back
-      return;
-    }
     build.now = three.clock.elapsedTime;
     const index = projectIndex(s);
     if (!build.started) {
@@ -724,8 +778,8 @@ function ModelFloor({ fill, line }) {
 
 // ---------- server room behind the model floor ----------
 const RACK_ROWS = [
-  { from: -10.6, to: -5.2, z: -15.6 },
-  { from: 5.2, to: 10.6, z: -15.6 },
+  { from: -13.4, to: -6.2, z: -21.8 },
+  { from: 6.2, to: 13.4, z: -21.8 },
 ];
 function ServerRoom({ fill, line }) {
   const leds = useSurface(128, 360, drawServerRack, true); // one animated texture, shared by every rack
@@ -749,13 +803,8 @@ function ServerRoom({ fill, line }) {
     return merge(parts);
   }, [racks]);
   const face = useMemo(() => new THREE.PlaneGeometry(0.62, 1.74), []);
-  // Hidden during experience, where only the racks' blank backs would show.
-  const group = useRef(null);
-  useFrame(() => {
-    if (group.current) group.current.visible = currentStop() < STOPS.experienceStart - 0.3;
-  });
   return (
-    <group ref={group}>
+    <group>
       <Outlined geo={geo} fill={fill} line={line} />
       {racks.map(({ x, z }, i) => (
         <mesh key={i} geometry={face} material={leds.mat} position={[x, 1.2, z + 0.48]} />
@@ -811,7 +860,7 @@ function Leaf({ index }) {
   useFrame(() => {
     const g = pivot.current;
     if (!g) return;
-    const turn = leafTurn(index, currentStop());
+    const turn = smootherstep(pages.turned - index);
     // Stack order: unturned leaves on the right (first on top), turned ones on the left (latest on top).
     const yRight = BOOK_TOP + (LEAVES - index) * 0.004;
     const yLeft = BOOK_TOP + index * 0.004;
@@ -893,14 +942,26 @@ function BookSet({ fill, line }) {
   );
 }
 
-/** The experience scene; only shown from the end of the projects onwards. */
+// How many leaves are turned right now (fractional while one is turning). It
+// moves toward leavesTurned(s) at about a second per leaf, so each turn plays
+// in full once you've arrived; a long jump (e.g. from the nav) goes faster.
+const pages = { turned: 0 };
+const SECONDS_PER_LEAF = 1.05;
+
+/** The experience book: always on its table at the back of the office. */
 function TheBook({ fill, line }) {
-  const group = useRef(null);
-  useFrame(() => {
-    if (group.current) group.current.visible = currentStop() > E - 0.9;
+  useFrame((_, delta) => {
+    const target = leavesTurned(currentStop(), scroll.mobile);
+    if (scroll.reduced) {
+      pages.turned = target;
+      return;
+    }
+    const diff = target - pages.turned;
+    const step = (Math.max(1, Math.abs(diff) * 0.6) / SECONDS_PER_LEAF) * Math.min(delta, 0.05);
+    pages.turned = Math.abs(diff) <= step ? target : pages.turned + Math.sign(diff) * step;
   });
   return (
-    <group ref={group}>
+    <group>
       <BookSet fill={fill} line={line} />
       {Array.from({ length: LEAVES }, (_, i) => (
         <Leaf key={i} index={i} />
@@ -919,7 +980,7 @@ function FloorGrid({ mobile }) {
       mat.depthWrite = false;
     }
   }, []);
-  return <gridHelper ref={ref} args={[80, mobile ? 40 : 80, OXBLOOD, OXBLOOD]} position={[0, 0, -6]} />;
+  return <gridHelper ref={ref} args={[110, mobile ? 55 : 110, OXBLOOD, OXBLOOD]} position={[0, 0, -6]} />;
 }
 
 // ---------- per-frame controllers ----------
@@ -1012,13 +1073,15 @@ function SurfaceUpdater({ mats, mobile, world }) {
     const t = track.current;
     const now = three.clock.elapsedTime;
 
-    // Wall screens (home) and the final fan: smooth playback while in view.
-    const playing =
-      s < 0.6 ? "zone" : s > STOPS.end - 0.5 ? "finale" : s > E - 0.6 && s < STOPS.end - 0.5 ? "book" : null;
-    if (playing && !scroll.reduced && now - t.zoneDraw > (mobile ? 0.2 : 0.1)) {
+    // Smooth playback for what's in view. The wall screens keep running all the
+    // way through (the office never stops), the book's figures once it's open,
+    // and the final fan at the end.
+    const finale = s > STOPS.end - 0.5;
+    const playing = new Set(finale ? ["finale"] : s > E - 0.6 ? ["zone", "book"] : ["zone"]);
+    if (!scroll.reduced && now - t.zoneDraw > (mobile ? 0.2 : 0.1)) {
       t.zoneDraw = now;
       surfaces.forEach((sf) => {
-        if (sf.kind !== playing) return;
+        if (!playing.has(sf.kind)) return;
         sf.draw(sf.ctx, sf.w, sf.h, now);
         sf.tex.needsUpdate = true;
       });
@@ -1041,12 +1104,18 @@ function SurfaceUpdater({ mats, mobile, world }) {
  * Card over the clicked agent's desk: the feature it's working on. Each click on
  * the same agent shows its next feature. Click the card (or anywhere else) to close.
  */
-function DeskCard({ index, clicks, mobile, onClose }) {
+function DeskCard({ index, clicks, mobile, onClose, onNext }) {
   // The agent works on whatever project its zone's screen is showing right now.
   const clock = useThree((st) => st.clock);
+  const you = index === YOU;
+  // You work across all three projects: each click is the next thing being built,
+  // rotating through the projects.
   const info = useMemo(
-    () => ({ agent: index, project: liveProjectAt(DESKS[index].zone, clock.elapsedTime), feature: zoneSlot(index) + clicks }),
-    [index, clicks, clock]
+    () =>
+      you
+        ? { you, project: clicks % 3, feature: Math.floor(clicks / 3) }
+        : { agent: index, project: liveProjectAt(DESKS[index].zone, clock.elapsedTime), feature: zoneSlot(index) + clicks },
+    [you, index, clicks, clock]
   );
   const draw = useMemo(() => (ctx, w, h) => drawAgentCard(ctx, w, h, info), [info]);
   const cardH = useMemo(() => agentCardHeight(880, info), [info]);
@@ -1068,16 +1137,16 @@ function DeskCard({ index, clicks, mobile, onClose }) {
     if (!m) return;
     openedAt.current ??= clock.elapsedTime;
     m.quaternion.copy(camera.quaternion);
-    if (mobile) {
-      // Phones: too narrow to float the card by the desk, so hold it centred in
-      // front of the camera, in the upper half of the screen, at 90% width.
+    if (mobile || you) {
+      // Phones (too narrow to float the card by the desk) and your own card:
+      // held in front of the camera, in the upper part of the screen.
       const dist = 6;
       const visH = 2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
       const visW = visH * (size.width / size.height);
       camera.getWorldDirection(forward);
       up.set(0, 1, 0).applyQuaternion(camera.quaternion);
-      m.position.copy(camera.position).addScaledVector(forward, dist).addScaledVector(up, visH * 0.18);
-      m.scale.setScalar((visW * 0.9) / 2.2);
+      m.position.copy(camera.position).addScaledVector(forward, dist).addScaledVector(up, visH * (you ? (mobile ? 0.12 : 0.29) : 0.2));
+      m.scale.setScalar((visW * (mobile ? 0.9 : 0.34)) / 2.2);
     } else {
       m.position.set(desk.x, 1.8 + (planeH / 2) * 2, desk.z - 0.4);
       m.scale.setScalar(2);
@@ -1093,7 +1162,9 @@ function DeskCard({ index, clicks, mobile, onClose }) {
       renderOrder={20}
       onClick={(e) => {
         e.stopPropagation();
-        onClose();
+        // Your card sits over the figure, so clicking it shows the next message.
+        if (you) onNext();
+        else onClose();
       }}
       onPointerOver={() => (document.body.style.cursor = "pointer")}
       onPointerOut={() => (document.body.style.cursor = "")}
@@ -1102,7 +1173,7 @@ function DeskCard({ index, clicks, mobile, onClose }) {
 }
 
 /** The selected agent's desk card. */
-function SceneLabels({ selected, mobile, onClose }) {
+function SceneLabels({ selected, mobile, onClose, onNext }) {
   return (
     <>
       {selected && (
@@ -1112,6 +1183,7 @@ function SceneLabels({ selected, mobile, onClose }) {
           clicks={selected.clicks}
           mobile={mobile}
           onClose={onClose}
+          onNext={onNext}
         />
       )}
     </>
@@ -1124,14 +1196,14 @@ function World({ mobile, selected, onSelect }) {
     () => ({ worldFill: fillMaterial(), worldLine: lineMaterial(), heroFill: fillMaterial(), heroLine: lineMaterial() }),
     []
   );
-  const icons = useMemo(() => createPictogramTextures(), []);
+  const icons = useMemo(() => createPictogramTextures({ mobile }), [mobile]);
   useEffect(() => () => icons.dispose(), [icons]);
   const world = useRef(null);
 
   return (
     <>
       <color attach="background" args={[PORCELAIN]} />
-      <fog attach="fog" args={[PORCELAIN, 14, mobile ? 55 : 64]} />
+      <fog attach="fog" args={[PORCELAIN, 16, mobile ? 70 : 82]} />
       <FloorGrid mobile={mobile} />
       <group ref={world}>
         {DESKS.map((_, i) => (
@@ -1148,10 +1220,10 @@ function World({ mobile, selected, onSelect }) {
       {DESKS.map((_, i) => (
         <Person key={i} index={i} icons={icons} selected={selected?.index === i} onSelect={onSelect} />
       ))}
-      <Hero icons={icons} />
+      <Hero icons={icons} onSelect={onSelect} />
       <HeroDesk fill={mats.heroFill} line={mats.heroLine} />
       <FinaleScreens />
-      <SceneLabels selected={selected} mobile={mobile} onClose={() => onSelect(null)} />
+      <SceneLabels selected={selected} mobile={mobile} onClose={() => onSelect(null)} onNext={() => onSelect(YOU)} />
       <CameraRig mobile={mobile} />
       <SurfaceUpdater mats={mats} mobile={mobile} world={world} />
     </>
@@ -1166,6 +1238,9 @@ export default function OfficeScene({ mobile, reduced, selected, onSelect }) {
         flat
         dpr={mobile ? [1, 1.25] : [1, 2]}
         frameloop={reduced ? "demand" : "always"}
+        onCreated={({ gl }) => {
+          gl.localClippingEnabled = true; // the wall screens lower into their cabinets
+        }}
         camera={{ fov: mobile ? 52 : 36, near: 0.1, far: 120, position: [11.5, 8.6, 12.5] }}
         gl={{ antialias: true, powerPreference: mobile ? "low-power" : "high-performance" }}
       >
