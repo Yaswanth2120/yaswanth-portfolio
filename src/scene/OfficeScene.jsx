@@ -1196,7 +1196,7 @@ function World({ mobile, selected, onSelect }) {
     () => ({ worldFill: fillMaterial(), worldLine: lineMaterial(), heroFill: fillMaterial(), heroLine: lineMaterial() }),
     []
   );
-  const icons = useMemo(() => createPictogramTextures(), []);
+  const icons = useMemo(() => createPictogramTextures({ mobile }), [mobile]);
   useEffect(() => () => icons.dispose(), [icons]);
   const world = useRef(null);
 

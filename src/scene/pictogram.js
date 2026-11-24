@@ -233,17 +233,25 @@ function drawPose(ctx, pose, solid, headphones = false) {
  * { outline, solid, hero: { [pose]: texture }, dispose() }
  * hero is the solid figure wearing headphones, for the final scene.
  */
-export function createPictogramTextures() {
+// Canvas resolution as a multiple of the 256 × 420 drawing size. The final
+// figure is seen large (it fills much of the screen at the end), so its two
+// typing poses get 4×; the team, always smaller on screen, gets 1.5×.
+const HERO_POSES = ["typeA", "typeB"];
+export function createPictogramTextures({ mobile = false } = {}) {
   const sets = { outline: {}, solid: {}, hero: {} };
   for (const style of ["outline", "solid", "hero"]) {
-    for (const name of POSE_NAMES) {
+    const names = style === "hero" ? HERO_POSES : POSE_NAMES;
+    const k = style === "hero" ? (mobile ? 2.5 : 4) : mobile ? 1 : 1.5;
+    for (const name of names) {
       const canvas = document.createElement("canvas");
-      canvas.width = ICON_W;
-      canvas.height = ICON_H;
-      drawPose(canvas.getContext("2d"), POSES[name], style !== "outline", style === "hero");
+      canvas.width = Math.round(ICON_W * k);
+      canvas.height = Math.round(ICON_H * k);
+      const ctx = canvas.getContext("2d");
+      ctx.scale(k, k);
+      drawPose(ctx, POSES[name], style !== "outline", style === "hero");
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
-      tex.anisotropy = 4;
+      tex.anisotropy = 8;
       sets[style][name] = tex;
     }
   }
