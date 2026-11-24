@@ -9,7 +9,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { scroll } from "@/lib/scroll";
 import {
   AGENTS, BOOK, DESKS, HERO, LEAVES, STOPS, ZONES, ZONE_SCREEN, leafTurn, zoneSlot, zoneToWorld,
-  cameraAt, clamp01, damp, heroOpacity, mix, projectIndex,
+  cameraAt, clamp01, damp, heroOpacity, mix, projectIndex, smoothRange,
   fanIn, peopleOpacity, personTarget, worldOpacity,
 } from "./choreography";
 import { ICON_WORLD_H, ICON_WORLD_W, createPictogramTextures } from "./pictogram";
@@ -410,14 +410,28 @@ function ZoneScreen({ index, fill, line }) {
   );
   const plane = useMemo(() => new THREE.PlaneGeometry(width, height * 0.98), [width, height]);
   const screenPos = zoneToWorld(ZONES[index], 0, z);
-  const group = useRef(null);
-  // Only on the home screen; afterwards it would block the project whiteboard.
+  // The middle screen stands between the desks and the model floor, so it
+  // fades to a faint outline while the camera looks past it at the projects.
+  const ghosts = index === 1;
+  const mats = useMemo(() => (ghosts ? { fill: fill.clone(), line: line.clone() } : { fill, line }), [ghosts, fill, line]);
+  useEffect(() => {
+    if (!ghosts) return undefined;
+    surface.ghost = (s) => 1 - 0.9 * smoothRange(0.35, 0.85, s) * (1 - smoothRange(E - 0.9, E - 0.4, s));
+    return () => {
+      mats.fill.dispose();
+      mats.line.dispose();
+    };
+  }, [ghosts, surface, mats]);
   useFrame(() => {
-    if (group.current) group.current.visible = currentStop() < 0.5;
+    if (!ghosts) return;
+    const s = currentStop();
+    const o = worldOpacity(s) * (surface.ghost ? surface.ghost(s) : 1);
+    mats.fill.opacity = o;
+    mats.line.opacity = o;
   });
   return (
-    <group ref={group} position={[screenPos.x, 0, screenPos.z]} rotation={[0, ZONES[index].rot, 0]}>
-      <Outlined geo={geo} fill={fill} line={line} />
+    <group position={[screenPos.x, 0, screenPos.z]} rotation={[0, ZONES[index].rot, 0]}>
+      <Outlined geo={geo} fill={mats.fill} line={mats.line} />
       <mesh geometry={plane} material={surface.mat} position={[0, y, 0.01]} />
     </group>
   );
@@ -597,6 +611,8 @@ function SystemModel({ index, fill, line }) {
     else if (index === build.previous && !reduced) up = () => 1 - clamp01(elapsed / SINK);
     else up = () => 0;
     const sinking = index !== build.current;
+    const dim = worldOpacity(currentStop()); // dims with the office at the end
+    packetMat.opacity = dim;
     g.visible = up(system.nodes.length - 1) > 0 || up(0) > 0;
     if (!g.visible) return;
 
@@ -608,7 +624,7 @@ function SystemModel({ index, fill, line }) {
         obj.scale.set(1, Math.max(0.001, sinking ? p : easeOutBack(p)), 1);
       }
       const tag = tagRefs[i].current;
-      if (tag) tag.opacity = clamp01((p - 0.6) / 0.4);
+      if (tag) tag.opacity = clamp01((p - 0.6) / 0.4) * dim;
       const spin = spinner.current[i];
       if (spin) {
         spin.visible = p > 0.001;
@@ -689,15 +705,10 @@ function ModelFloor({ fill, line }) {
   }, [w, d]);
   const group = useRef(null);
 
-  // Only during projects: from the experience side we'd only be in the way.
+  // Always standing in the office: the first project before you reach it,
+  // the last one after you've moved on to the book.
   useFrame((three) => {
     const s = currentStop();
-    const visible = s > 0.25 && s < STOPS.experienceStart - 0.35;
-    if (group.current) group.current.visible = visible;
-    if (!visible) {
-      build.started = false; // rebuild from scratch on the way back
-      return;
-    }
     build.now = three.clock.elapsedTime;
     const index = projectIndex(s);
     if (!build.started) {
@@ -749,13 +760,8 @@ function ServerRoom({ fill, line }) {
     return merge(parts);
   }, [racks]);
   const face = useMemo(() => new THREE.PlaneGeometry(0.62, 1.74), []);
-  // Hidden during experience, where only the racks' blank backs would show.
-  const group = useRef(null);
-  useFrame(() => {
-    if (group.current) group.current.visible = currentStop() < STOPS.experienceStart - 0.3;
-  });
   return (
-    <group ref={group}>
+    <group>
       <Outlined geo={geo} fill={fill} line={line} />
       {racks.map(({ x, z }, i) => (
         <mesh key={i} geometry={face} material={leds.mat} position={[x, 1.2, z + 0.48]} />
@@ -893,14 +899,10 @@ function BookSet({ fill, line }) {
   );
 }
 
-/** The experience scene; only shown from the end of the projects onwards. */
+/** The experience book: always on its table at the back of the office. */
 function TheBook({ fill, line }) {
-  const group = useRef(null);
-  useFrame(() => {
-    if (group.current) group.current.visible = currentStop() > E - 0.9;
-  });
   return (
-    <group ref={group}>
+    <group>
       <BookSet fill={fill} line={line} />
       {Array.from({ length: LEAVES }, (_, i) => (
         <Leaf key={i} index={i} />
@@ -1002,7 +1004,7 @@ function SurfaceUpdater({ mats, mobile, world }) {
     mats.worldFill.opacity = w;
     mats.worldLine.opacity = w;
     surfaces.forEach((sf) => {
-      if (sf.kind === null || sf.kind === "board" || sf.kind === "zone") sf.mat.opacity = w;
+      if (sf.kind === null || sf.kind === "board" || sf.kind === "zone") sf.mat.opacity = w * (sf.ghost ? sf.ghost(s) : 1);
     });
     if (world.current) world.current.visible = w > 0.005;
     const h = heroOpacity(s);
@@ -1012,13 +1014,15 @@ function SurfaceUpdater({ mats, mobile, world }) {
     const t = track.current;
     const now = three.clock.elapsedTime;
 
-    // Wall screens (home) and the final fan: smooth playback while in view.
-    const playing =
-      s < 0.6 ? "zone" : s > STOPS.end - 0.5 ? "finale" : s > E - 0.6 && s < STOPS.end - 0.5 ? "book" : null;
-    if (playing && !scroll.reduced && now - t.zoneDraw > (mobile ? 0.2 : 0.1)) {
+    // Smooth playback for what's in view. The wall screens keep running all the
+    // way through (the office never stops), the book's figures once it's open,
+    // and the final fan at the end.
+    const finale = s > STOPS.end - 0.5;
+    const playing = new Set(finale ? ["finale"] : s > E - 0.6 ? ["zone", "book"] : ["zone"]);
+    if (!scroll.reduced && now - t.zoneDraw > (mobile ? 0.2 : 0.1)) {
       t.zoneDraw = now;
       surfaces.forEach((sf) => {
-        if (sf.kind !== playing) return;
+        if (!playing.has(sf.kind)) return;
         sf.draw(sf.ctx, sf.w, sf.h, now);
         sf.tex.needsUpdate = true;
       });

@@ -1,6 +1,7 @@
 // Where everything is, and where everyone goes, at each scroll stop.
 //
-// Timeline (one stop per page section):
+// Everything stands in one office the whole time; each stop moves the camera to
+// a different part of it. Timeline (one stop per page section):
 //   0       intro: a curved office, 18 people working across three live projects
 //   1 – 4   the model floor: each project builds itself as a working miniature
 //           in front of the server room. Half the team works on it; the rest
@@ -8,8 +9,9 @@
 //   5 – 7   experience, "chapters": a book on a writing table in the open
 //           plain. It opens as you arrive; each job is one spread, and the page
 //           turns as you scroll to the next. The team is back at work.
-//   8       contact. On the way there (7 → 8) the book fades, you sit at the desk, the
-//           team merges into you, and the screens fan out above.
+//   8       contact. On the way there (7 → 8) the camera rises over the office and
+//           comes down at the front: you sit at the desk, the team merges into
+//           you, the screens fan out above, and the office dims behind.
 
 import { MODEL_FLOOR } from "./systems";
 
@@ -53,7 +55,9 @@ export const BOOK = { x: 0, z: -20, table: 0.92, pageW: 1.6, pageH: 2.1 };
  * on the last leaf's front and never turns.
  */
 export const LEAVES = JOBS + 2;
-export const HERO = { x: 0, z: -3 };
+// The final desk stands on the open floor at the front of the office, so the
+// whole office is still there behind you at the end.
+export const HERO = { x: 0, z: 6 };
 
 // ---------- math helpers ----------
 export const clamp01 = (v) => Math.min(1, Math.max(0, v));
@@ -189,7 +193,8 @@ export function personTarget(i, s) {
 }
 
 // ---------- fades ----------
-export const worldOpacity = (s) => 1 - smoothRange(M + 0.3, M + 0.6, s);
+// The office never leaves: at the end it only dims, so the final figure reads against it.
+export const worldOpacity = (s) => 1 - 0.7 * smoothRange(M + 0.3, M + 0.6, s);
 export const peopleOpacity = (s) => 1 - smoothRange(M + 0.66, M + 0.78, s);
 export const heroOpacity = (s) => smoothRange(M + 0.64, MERGED, s);
 /** 0 → 1 as screen i of the final fan flies in. */
@@ -233,7 +238,9 @@ const CAMERA_KEYS = [
   ...[0, 1, 2, 3].map(modelShot),
   ...Array.from({ length: JOBS }, (_, k) => bookShot(k)),
   // On phones the contact panel covers the lower half, so lift the scene above it.
-  { pos: [0, 2.9, 8.6], look: [0, 1.6, HERO.z], offset: 0, mobileOffset: 0.9 },
+  // `lift` raises the camera mid-move: from the book it rises up over the whole
+  // office and comes down in front of the final desk, rather than flying through it.
+  { pos: [0, 2.9, HERO.z + 11.6], look: [0, 1.6, HERO.z], offset: 0, mobileOffset: 0.9, lift: 9 },
 ];
 
 export function cameraAt(s) {
@@ -246,8 +253,10 @@ export function cameraAt(s) {
   const lerp3 = (p, q) => [mix(p[0], q[0], f), mix(p[1], q[1], f), mix(p[2], q[2], f)];
   const mOff = (k) => k.mobileOffset ?? k.offset;
   const mZoom = (k) => k.mobileZoom ?? 1.5;
+  const pos = lerp3(a.pos, b.pos);
+  pos[1] += (b.lift ?? 0) * Math.sin(Math.PI * f);
   return {
-    pos: lerp3(a.pos, b.pos),
+    pos,
     look: lerp3(a.look, b.look),
     offset: mix(a.offset, b.offset, f),
     mobileOffset: mix(mOff(a), mOff(b), f),
