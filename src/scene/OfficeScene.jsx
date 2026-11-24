@@ -1,6 +1,6 @@
-// The scroll-driven office: seven 2D pictogram people working at their desks
-// who gather at a whiteboard, work at sites along the milestone path, then
-// merge into one figure. Click a person on the home screen to see their role.
+// The scroll-driven office: 2D pictogram people working at their desks, who
+// build each project as a working model on the floor, then merge into one
+// figure. Click a person on the home screen to see what they're working on.
 // Everything is porcelain fill + oxblood edge lines, in same-colour fog.
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -8,15 +8,18 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { scroll } from "@/lib/scroll";
 import {
-  AGENTS, BOOK, DESKS, HERO, LEAVES, PRESENTERS, STOPS, WHITEBOARD, ZONES, ZONE_SCREEN, leafTurn, zoneSlot, zoneToWorld,
-  boardIndex, cameraAt, clamp01, damp, heroOpacity, isPresenting, mix,
-  fanIn, peopleOpacity, personTarget, smoothRange, worldOpacity,
+  AGENTS, BOOK, DESKS, HERO, LEAVES, STOPS, ZONES, ZONE_SCREEN, leafTurn, zoneSlot, zoneToWorld,
+  cameraAt, clamp01, damp, heroOpacity, mix, projectIndex,
+  fanIn, peopleOpacity, personTarget, worldOpacity,
 } from "./choreography";
 import { ICON_WORLD_H, ICON_WORLD_W, createPictogramTextures } from "./pictogram";
 import { PAGE_H, PAGE_W, blankPage, bookPage, isLivePage } from "./book";
-import { FUTURE_SCREENS, agentCardHeight, drawAgentCard, drawLiveScreen, drawProjectBoard, liveProjectAt } from "./demos";
+import { FUTURE_SCREENS, agentCardHeight, drawAgentCard, drawLiveScreen, liveProjectAt } from "./demos";
 import {
-  DESK_SCREENS, OXBLOOD, PORCELAIN, drawServerRack, drawSketchBoard,
+  MODEL_FLOOR, RISE, STAGGER, SINK, SYSTEMS, nodeSize, packetAt, pathLength, pointAt, tagHeight, trackPoints,
+} from "./systems";
+import {
+  DESK_SCREENS, OXBLOOD, PORCELAIN, drawServerRack, drawSketchBoard, ink, mono, paper, text,
 } from "./screens";
 
 // ---------- materials & geometry helpers ----------
@@ -181,7 +184,6 @@ function Person({ index, icons, selected, onSelect }) {
     const screenDir = vx * right.x + vz * right.z;
     if (Math.abs(screenDir) > 0.05) p.dir = screenDir >= 0 ? 1 : -1;
 
-    const presenting = isPresenting(s) && PRESENTERS[boardIndex(s)] === index;
     const beat = Math.floor(time * 1.4 + index * 0.53) % 2 ? "B" : "A"; // slow two-frame loop
     let pose;
     if (p.sit > 0.5) pose = Math.floor(time * 2.6 + index * 0.37) % 2 ? "typeB" : "typeA";
@@ -189,7 +191,7 @@ function Person({ index, icons, selected, onSelect }) {
       const step = Math.floor(p.phase / Math.PI) % 2 ? "B" : "A";
       pose = target.act === "carry" ? `carryWalk${step}` : `walk${step}`;
     }
-    else if (target.act === "point" || presenting) pose = "point";
+    else if (target.act === "point") pose = "point";
     else if (target.act === "laptop") pose = `laptop${beat}`;
     else if (target.act === "carry") pose = `carry${beat}`;
     else if (target.act === "talk") pose = `talk${beat}`;
@@ -441,44 +443,286 @@ function Plants({ fill, line }) {
   return <Outlined geo={geo} fill={fill} line={line} />;
 }
 
-// The whiteboard plays a live demo of the project currently being presented.
-// Between two project stops the next demo wipes in, driven by scroll.
-const boardState = { from: 0, to: 0, progress: 0 };
-const drawBoardAt = (ctx, w, h, t) =>
-  drawProjectBoard(ctx, w, h, boardState.from, boardState.to, boardState.progress, t);
+// ---------- the model floor (projects) ----------
+// Each project builds itself as a working miniature on the floor: components
+// rise one by one, tracks are laid between them, then packets run through.
+// Moving on sinks the current system back into the floor and builds the next.
+const build = { current: 0, previous: -1, changedAt: 0, started: false, now: 0 };
+const easeOutBack = (p) => 1 + 2.3 * (p - 1) ** 3 + 1.3 * (p - 1) ** 2;
 
-function Whiteboard({ fill, line }) {
-  const surface = useSurface(1024, 490, drawBoardAt, false, "board");
-  const { width, height } = WHITEBOARD;
-  const geo = useMemo(
-    () =>
-      merge([
-        boxGeo(width + 0.1, height + 0.1, 0.05, 0, WHITEBOARD.y, 0),
-        boxGeo(0.05, WHITEBOARD.y + height / 2 + 0.2, 0.05, -width / 2 + 0.2, (WHITEBOARD.y + height / 2 + 0.2) / 2, -0.05),
-        boxGeo(0.05, WHITEBOARD.y + height / 2 + 0.2, 0.05, width / 2 - 0.2, (WHITEBOARD.y + height / 2 + 0.2) / 2, -0.05),
-        boxGeo(0.7, 0.04, 0.5, -width / 2 + 0.2, 0.02, -0.05),
-        boxGeo(0.7, 0.04, 0.5, width / 2 - 0.2, 0.02, -0.05),
-        boxGeo(1.2, 0.04, 0.12, 0, WHITEBOARD.y - height / 2 - 0.05, 0.05),
-      ]),
-    [width, height]
+function nodeGeometry(node) {
+  const [w, h, d] = nodeSize(node);
+  switch (node.kind) {
+    case "tall":
+      return merge([
+        boxGeo(w, h, d, 0, h / 2, 0),
+        ...[0.3, 0.5, 0.7].map((f) => boxGeo(0.04, 0.05, d * 0.7, w / 2 + 0.02, h * f, 0)), // vents
+      ]);
+    case "store":
+      return merge([
+        cylGeo(w / 2, w / 2, h, 24, 0, h / 2, 0),
+        cylGeo(w / 2 + 0.02, w / 2 + 0.02, 0.03, 24, 0, h * 0.36, 0),
+        cylGeo(w / 2 + 0.02, w / 2 + 0.02, 0.03, 24, 0, h * 0.68, 0),
+      ]);
+    case "file":
+      return merge([
+        boxGeo(w, h, d, 0, h / 2 + 0.06, 0),
+        boxGeo(w * 0.7, 0.06, 0.3, 0, 0.03, 0), // stand
+        ...[0.55, 0.66, 0.77].map((f) => boxGeo(w * 0.62, 0.025, 0.02, 0, h * f, d / 2 + 0.01)), // lines of text
+      ]);
+    case "model":
+      return merge([cylGeo(0.22, 0.3, 0.32, 16, 0, 0.16, 0), cylGeo(0.04, 0.04, 0.4, 8, 0, 0.5, 0)]);
+    case "gate":
+      // An archway across the track (the track runs along x through it).
+      return merge([
+        boxGeo(0.14, h, 0.14, 0, h / 2, -w / 2),
+        boxGeo(0.14, h, 0.14, 0, h / 2, w / 2),
+        boxGeo(0.2, 0.16, w + 0.2, 0, h, 0),
+        boxGeo(0.36, 0.04, 0.3, 0, 0.02, -w / 2),
+        boxGeo(0.36, 0.04, 0.3, 0, 0.02, w / 2),
+      ]);
+    case "meter":
+      return merge([
+        boxGeo(w, h, d, 0, h / 2, 0),
+        ...[0.2, 0.4, 0.6, 0.8].map((f) => boxGeo(0.1, 0.02, 0.02, w / 2 + 0.05, h * f, d / 2)), // scale ticks
+      ]);
+    default:
+      return merge([boxGeo(w, h, d, 0, h / 2, 0), boxGeo(w * 0.55, 0.05, 0.02, 0, h * 0.62, d / 2 + 0.01)]);
+  }
+}
+
+const TAG_PX = 64; // canvas px per tag height
+const TAG_H = 0.24; // world height of a tag
+function NodeTag({ node, tagRef }) {
+  const width = Math.ceil(node.label.length * 19.2 + 44);
+  const draw = useMemo(
+    () => (ctx, w, h) => {
+      paper(ctx, w, h, false);
+      ctx.strokeStyle = ink(1);
+      ctx.lineWidth = 3;
+      ctx.strokeRect(1.5, 1.5, w - 3, h - 3);
+      text(ctx, node.label, w / 2, h / 2 + 11, mono(32), 1, "center");
+    },
+    [node.label]
   );
-  const plane = useMemo(() => new THREE.PlaneGeometry(width, height * 0.98), [width, height]);
-  // Only during projects: hidden behind the home-screen office, and from the
-  // tower's side (experience) we'd only see its blank back.
-  const group = useRef(null);
-  useFrame(() => {
-    const s = currentStop();
-    if (group.current) group.current.visible = s > 0.25 && s < STOPS.experienceStart - 0.35;
+  const surface = useSurface(width, TAG_PX, draw, false, "tag");
+  const plane = useMemo(() => new THREE.PlaneGeometry((width / TAG_PX) * TAG_H, TAG_H), [width]);
+  useEffect(() => {
+    surface.mat.opacity = 0;
+    tagRef.current = surface.mat;
+  }, [surface, tagRef]);
+  return <mesh userData={{ tag: true }} geometry={plane} material={surface.mat} position={[node.x, tagHeight(node), node.z]} />;
+}
+
+/** Two rails either side of a track, as polylines (so they can be laid progressively). */
+function railGeometries(pts) {
+  const rails = [-0.07, 0.07].map((off) =>
+    pts.map((p, i) => {
+      // Mitred offset at each corner (tracks only turn at right angles).
+      const prev = pts[Math.max(0, i - 1)];
+      const next = pts[Math.min(pts.length - 1, i + 1)];
+      const dir = (a, b) => {
+        const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+        return [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+      };
+      const d1 = i > 0 ? dir(prev, p) : dir(p, next);
+      const d2 = i < pts.length - 1 ? dir(p, next) : d1;
+      const nx = -(d1[1] + d2[1]);
+      const nz = d1[0] + d2[0];
+      const nl = Math.hypot(nx, nz) || 1;
+      const miter = 1 / Math.max(0.5, (nx / nl) * -d1[1] + (nz / nl) * d1[0]);
+      return [p[0] + (nx / nl) * off * miter, p[1] + (nz / nl) * off * miter];
+    })
+  );
+  // Resample every 5 cm so the draw range can grow smoothly.
+  return rails.map((rail) => {
+    const len = pathLength(rail);
+    const count = Math.max(2, Math.ceil(len / 0.05));
+    const positions = [];
+    for (let k = 0; k <= count; k++) {
+      const [x, z] = pointAt(rail, k / count);
+      positions.push(x, 0.075, z);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    return g;
   });
+}
+
+const PACKETS_PER_LINK = 3;
+const packetGeo = new THREE.BoxGeometry(0.13, 0.13, 0.13);
+
+function SystemModel({ index, fill, line }) {
+  const system = SYSTEMS[index];
+  const group = useRef(null);
+  const nodeRefs = useRef([]);
+  const tagRefs = useMemo(() => system.nodes.map(() => ({ current: null })), [system]);
+  const spinner = useRef([]);
+  const geos = useMemo(() => system.nodes.map(nodeGeometry), [system]);
+  const ico = useMemo(() => new THREE.IcosahedronGeometry(0.42, 0), []);
+  const tracks = useMemo(
+    () =>
+      system.links.map((link) => {
+        const pts = trackPoints(system, link);
+        const rails = railGeometries(pts).map((g) => new THREE.Line(g, line));
+        const from = system.nodes.findIndex((node) => node.id === link.from);
+        const to = system.nodes.findIndex((node) => node.id === link.to);
+        return { link, pts, len: pathLength(pts), rails, after: Math.max(from, to) };
+      }),
+    [system, line]
+  );
+  const packetMat = useMemo(() => new THREE.MeshBasicMaterial({ color: OXBLOOD, transparent: true }), []);
+  const packets = useMemo(() => {
+    const mesh = new THREE.InstancedMesh(packetGeo, packetMat, tracks.length * PACKETS_PER_LINK);
+    mesh.frustumCulled = false;
+    return mesh;
+  }, [tracks, packetMat]);
+  const m4 = useMemo(() => new THREE.Matrix4(), []);
+  const q = useMemo(() => new THREE.Quaternion(), []);
+  const pos = useMemo(() => new THREE.Vector3(), []);
+  const scl = useMemo(() => new THREE.Vector3(), []);
+  useEffect(() => () => packetMat.dispose(), [packetMat]);
+
+  // Time each node starts rising, and when the whole system is up.
+  const nodeStart = (i) => 0.25 + i * STAGGER;
+  const builtAt = nodeStart(system.nodes.length - 1) + RISE + 0.35;
+
+  useFrame(({ camera }) => {
+    const g = group.current;
+    if (!g) return;
+    const reduced = scroll.reduced;
+    const elapsed = reduced ? 999 : build.now - build.changedAt;
+    let up; // 0 → 1: how built this system is, per node
+    if (index === build.current) up = (i) => clamp01((elapsed - nodeStart(i)) / RISE);
+    else if (index === build.previous && !reduced) up = () => 1 - clamp01(elapsed / SINK);
+    else up = () => 0;
+    const sinking = index !== build.current;
+    g.visible = up(system.nodes.length - 1) > 0 || up(0) > 0;
+    if (!g.visible) return;
+
+    system.nodes.forEach((node, i) => {
+      const p = up(i);
+      const obj = nodeRefs.current[i];
+      if (obj) {
+        obj.visible = p > 0.001;
+        obj.scale.set(1, Math.max(0.001, sinking ? p : easeOutBack(p)), 1);
+      }
+      const tag = tagRefs[i].current;
+      if (tag) tag.opacity = clamp01((p - 0.6) / 0.4);
+      const spin = spinner.current[i];
+      if (spin) {
+        spin.visible = p > 0.001;
+        spin.position.y = 1.05 * (sinking ? p : easeOutBack(p));
+        if (!reduced) spin.rotation.set(0.4, build.now * 0.6, 0.2);
+      }
+    });
+    g.children.forEach((child) => {
+      if (child.userData.tag) child.quaternion.copy(camera.quaternion);
+    });
+
+    // Lay each track once both its ends are up; take it up when sinking.
+    tracks.forEach((track) => {
+      const p = sinking ? up(0) : clamp01((elapsed - nodeStart(track.after) - RISE * 0.6) / 0.45);
+      track.rails.forEach((rail) => {
+        const count = rail.geometry.attributes.position.count;
+        rail.geometry.setDrawRange(0, Math.floor(p * count));
+      });
+    });
+
+    // Packets run once the whole system is built.
+    const flow = sinking ? 0 : clamp01((elapsed - builtAt) / 0.4);
+    const t = reduced ? 1.3 : build.now;
+    tracks.forEach((track, li) => {
+      for (let k = 0; k < PACKETS_PER_LINK; k++) {
+        const f = packetAt(track.link, track.len, k, PACKETS_PER_LINK, t);
+        const [x, z] = pointAt(track.pts, f);
+        pos.set(x, 0.14, z);
+        const size = flow * (f < 0.04 || f > 0.96 ? 0.4 : 1); // shrink into the boxes at either end
+        scl.setScalar(Math.max(0.0001, size));
+        m4.compose(pos, q, scl);
+        packets.setMatrixAt(li * PACKETS_PER_LINK + k, m4);
+      }
+    });
+    packets.instanceMatrix.needsUpdate = true;
+  });
+
   return (
-    <group ref={group} position={[WHITEBOARD.x, 0, WHITEBOARD.z]}>
-      <Outlined geo={geo} fill={fill} line={line} />
-      <mesh geometry={plane} material={surface.mat} position={[0, WHITEBOARD.y, 0.03]} />
+    <group ref={group} visible={false}>
+      {system.nodes.map((node, i) => (
+        <group key={node.id} ref={(el) => (nodeRefs.current[i] = el)} position={[node.x, 0.06, node.z]}>
+          <Outlined geo={geos[i]} fill={fill} line={line} />
+          {node.kind === "meter" && (
+            <mesh material={packetMat} position={[0, nodeSize(node)[1] * 0.82, 0]}>
+              <boxGeometry args={[nodeSize(node)[0] + 0.1, 0.06, nodeSize(node)[2] + 0.1]} />
+            </mesh>
+          )}
+        </group>
+      ))}
+      {system.nodes.map((node, i) =>
+        node.kind === "model" ? (
+          <group key={`spin-${node.id}`} ref={(el) => (spinner.current[i] = el)} position={[node.x, 1.05, node.z]}>
+            <Outlined geo={ico} fill={fill} line={line} />
+          </group>
+        ) : null
+      )}
+      {tracks.map((track, i) => track.rails.map((rail, r) => <primitive key={`${i}-${r}`} object={rail} />))}
+      <primitive object={packets} />
+      {system.nodes.map((node, i) => (
+        <NodeTag key={`tag-${node.id}`} node={node} tagRef={tagRefs[i]} />
+      ))}
     </group>
   );
 }
 
-// ---------- server room behind the whiteboard ----------
+function ModelFloor({ fill, line }) {
+  const { x, z, w, d } = MODEL_FLOOR;
+  // A low plinth with corner marks, like a model-maker's base board.
+  const geo = useMemo(() => {
+    const parts = [boxGeo(w, 0.06, d, 0, 0.03, 0)];
+    [-1, 1].forEach((sx) =>
+      [-1, 1].forEach((sz) => {
+        parts.push(boxGeo(0.5, 0.03, 0.05, sx * (w / 2 - 0.45), 0.075, sz * (d / 2 - 0.2)));
+        parts.push(boxGeo(0.05, 0.03, 0.5, sx * (w / 2 - 0.2), 0.075, sz * (d / 2 - 0.45)));
+      })
+    );
+    return merge(parts);
+  }, [w, d]);
+  const group = useRef(null);
+
+  // Only during projects: from the experience side we'd only be in the way.
+  useFrame((three) => {
+    const s = currentStop();
+    const visible = s > 0.25 && s < STOPS.experienceStart - 0.35;
+    if (group.current) group.current.visible = visible;
+    if (!visible) {
+      build.started = false; // rebuild from scratch on the way back
+      return;
+    }
+    build.now = three.clock.elapsedTime;
+    const index = projectIndex(s);
+    if (!build.started) {
+      build.started = true;
+      build.current = index;
+      build.previous = -1;
+      build.changedAt = build.now;
+    } else if (index !== build.current) {
+      build.previous = build.current;
+      build.current = index;
+      build.changedAt = build.now;
+    }
+  });
+
+  return (
+    <group ref={group} position={[x, 0, z]}>
+      <Outlined geo={geo} fill={fill} line={line} />
+      {SYSTEMS.map((_, i) => (
+        <SystemModel key={i} index={i} fill={fill} line={line} />
+      ))}
+    </group>
+  );
+}
+
+// ---------- server room behind the model floor ----------
 const RACK_ROWS = [
   { from: -10.6, to: -5.2, z: -15.6 },
   { from: 5.2, to: 10.6, z: -15.6 },
@@ -653,7 +897,7 @@ function BookSet({ fill, line }) {
 function TheBook({ fill, line }) {
   const group = useRef(null);
   useFrame(() => {
-    if (group.current) group.current.visible = currentStop() > E - 1.2;
+    if (group.current) group.current.visible = currentStop() > E - 0.9;
   });
   return (
     <group ref={group}>
@@ -721,11 +965,8 @@ function CameraRig({ mobile }) {
   return null;
 }
 
-// A moment late in each demo's loop, used as the still frame.
-const BOARD_STILL_T = 8.8;
-
 function SurfaceUpdater({ mats, mobile, world }) {
-  const track = useRef({ redraw: 0, board: -1, boardDraw: 0, zoneDraw: 0 });
+  const track = useRef({ redraw: 0, zoneDraw: 0 });
   const invalidate = useThree((st) => st.invalidate);
 
   useEffect(() => {
@@ -734,7 +975,7 @@ function SurfaceUpdater({ mats, mobile, world }) {
     document.fonts?.ready.then(() => {
       if (!alive) return;
       surfaces.forEach((sf) => {
-        sf.draw(sf.ctx, sf.w, sf.h, sf.kind === "board" ? BOARD_STILL_T : 0);
+        sf.draw(sf.ctx, sf.w, sf.h, 0);
         sf.tex.needsUpdate = true;
       });
       invalidate();
@@ -770,25 +1011,6 @@ function SurfaceUpdater({ mats, mobile, world }) {
 
     const t = track.current;
     const now = three.clock.elapsedTime;
-
-    // Whiteboard demo: smooth playback while the projects are on screen; a still
-    // frame otherwise (and always, with reduced motion).
-    const board = boardIndex(s);
-    const live = !scroll.reduced && s > 0.3 && s < STOPS.experienceStart + 0.2;
-    if (board !== t.board || (live && now - t.boardDraw > (mobile ? 0.15 : 1 / 14))) {
-      t.board = board;
-      t.boardDraw = now;
-      const p = Math.min(3, Math.max(0, s - STOPS.projectsStart));
-      boardState.from = Math.min(3, Math.floor(p));
-      boardState.to = Math.min(3, boardState.from + 1);
-      boardState.progress = scroll.reduced ? 0 : smoothRange(0.25, 0.75, p - boardState.from);
-      if (scroll.reduced) boardState.from = board;
-      surfaces.forEach((sf) => {
-        if (sf.kind !== "board") return;
-        sf.draw(sf.ctx, sf.w, sf.h, live ? now : BOARD_STILL_T);
-        sf.tex.needsUpdate = true;
-      });
-    }
 
     // Wall screens (home) and the final fan: smooth playback while in view.
     const playing =
@@ -915,7 +1137,7 @@ function World({ mobile, selected, onSelect }) {
         {DESKS.map((_, i) => (
           <Desk key={i} index={i} fill={mats.worldFill} line={mats.worldLine} />
         ))}
-        <Whiteboard fill={mats.worldFill} line={mats.worldLine} />
+        <ModelFloor fill={mats.worldFill} line={mats.worldLine} />
         {ZONES.map((_, i) => (
           <ZoneScreen key={i} index={i} fill={mats.worldFill} line={mats.worldLine} />
         ))}

@@ -2,13 +2,16 @@
 //
 // Timeline (one stop per page section):
 //   0       intro: a curved office, 18 people working across three live projects
-//   1 – 4   half the team presents at the whiteboard (server room behind);
-//           the rest keep working at their desks
+//   1 – 4   the model floor: each project builds itself as a working miniature
+//           in front of the server room. Half the team works on it; the rest
+//           keep working at their desks
 //   5 – 7   experience, "chapters": a book on a writing table in the open
 //           plain. It opens as you arrive; each job is one spread, and the page
 //           turns as you scroll to the next. The team is back at work.
 //   8       contact. On the way there (7 → 8) the book fades, you sit at the desk, the
 //           team merges into you, and the screens fan out above.
+
+import { MODEL_FLOOR } from "./systems";
 
 // Number of jobs (one stop and one book spread each): keep in sync with content.experience.items.
 export const JOBS = 3;
@@ -40,8 +43,6 @@ export const AGENTS = DESKS.length;
 /** Which slot (0–5) an agent sits in within its zone. */
 export const zoneSlot = (i) => i % 6;
 const SEAT_OFFSET = 0.85;
-// Board canvas is 1024 × 490, so width / (height × 0.98) keeps that 2.09 aspect.
-export const WHITEBOARD = { x: 0, z: -12, y: 2.05, width: 6.2, height: 3.03 };
 // The experience book, open on a writing table. Pages are W × H; the spine runs
 // along z at x = BOOK.x, and the page tops point away from the camera (-z).
 export const BOOK = { x: 0, z: -20, table: 0.92, pageW: 1.6, pageH: 2.1 };
@@ -100,17 +101,32 @@ function seat(i) {
   return { x: d.x - Math.sin(d.rot) * SEAT_OFFSET, z: d.z - Math.cos(d.rot) * SEAT_OFFSET };
 }
 
-// Half the team presents each project; the other half keeps working.
+// Half the team builds each project on the model floor; the other half keeps working.
 const attends = (i) => i % 2 === 0;
-/** Presenters' indices (all attendees) for each of the four projects. */
-export const PRESENTERS = [8, 2, 12, 6];
 
-/** A spot in the arc in front of the whiteboard, for attendees. */
-function boardSpot(i) {
-  const j = i / 2; // 0 … 8
-  const angle = mix(-1.0, 1.0, j / 8);
-  const radius = 3.5 + (j % 2) * 0.7;
-  return { x: WHITEBOARD.x + Math.sin(angle) * radius, z: WHITEBOARD.z + Math.cos(angle) * radius };
+// Where the builders work around the model (floor-local x, z), and what they do:
+// behind it on laptops, along the sides carrying parts in, one checking it over.
+const BUILD_SPOTS = [
+  { x: -4.2, z: -3.6, act: "laptop" },
+  { x: -1.4, z: -3.7, act: "talk" },
+  { x: 1.4, z: -3.7, act: "laptop" },
+  { x: 4.2, z: -3.6, act: "talk" },
+  { x: -6.3, z: -1.4, act: "carry", move: { dx: 0, dz: 2.6, period: 7 } },
+  { x: 6.3, z: -1.4, act: "carry", move: { dx: 0, dz: 2.6, period: 8 } },
+  { x: -6.4, z: 1.9, act: "laptop" },
+  { x: 6.4, z: 1.9, act: "point" },
+  { x: -5.2, z: 3.6, act: "point" },
+];
+function buildSpot(i) {
+  const spot = BUILD_SPOTS[i / 2];
+  return { ...spot, x: MODEL_FLOOR.x + spot.x, z: MODEL_FLOOR.z + spot.z };
+}
+/** Walk from the aisle to a build spot, around the model rather than through it. */
+function toBuildSpot(desk, spot) {
+  const aisle = { x: desk.x, z: -7.6 };
+  if (spot.z > MODEL_FLOOR.z - 2) return [desk, aisle, spot];
+  const side = { x: Math.sign(spot.x) * 6.4, z: -7.8 };
+  return [desk, aisle, side, { x: side.x, z: spot.z }, spot];
 }
 
 /** A spot on the ring around the hero, just before the merge. */
@@ -131,28 +147,31 @@ const seated = (spot) => ({ ...spot, sit: 1, face: 0, merge: 0 });
 export function personTarget(i, s) {
   const desk = seat(i);
   const goesToBoard = attends(i);
-  const board = boardSpot(i);
-  const boardCenter = { x: WHITEBOARD.x, z: WHITEBOARD.z };
-  const via = (x) => ({ x, z: -7.6 });
+  const spot = goesToBoard ? buildSpot(i) : null;
+  const center = { x: MODEL_FLOOR.x, z: MODEL_FLOOR.z };
 
   if (s <= B - 0.45) return seated(desk);
 
-  // Projects: attendees walk to the whiteboard; everyone else keeps working.
+  // Projects: builders walk out to the model floor; everyone else keeps working.
   if (s < E - 0.7) {
     if (!goesToBoard) return seated(desk);
     if (s < B + 0.1) {
       const sit = 1 - clamp01((s - (B - 0.45)) / 0.08);
       const t = smoothRange(B - 0.4, B + 0.1, s);
-      return { ...alongPath([desk, via(desk.x), board], t), sit, face: t >= 1 ? facing(board, boardCenter) : null, merge: 0 };
+      const at = alongPath(toBuildSpot(desk, spot), t);
+      return t >= 1
+        ? { ...spot, sit, face: facing(spot, center), merge: 0 }
+        : { ...at, sit, face: null, merge: 0 };
     }
-    return { ...board, sit: 0, face: facing(board, boardCenter), merge: 0 };
+    return { ...spot, sit: 0, face: facing(spot, center), merge: 0 };
   }
 
-  // Into experience: presenters go back to their desks; everyone works on.
+  // Into experience: builders go back to their desks; everyone works on.
   if (s < E) {
     if (!goesToBoard) return seated(desk);
     const t = smoothRange(E - 0.7, E, s);
-    return { ...alongPath([board, via(desk.x), desk], t), sit: t >= 1 ? 1 : 0, face: null, merge: 0 };
+    const path = toBuildSpot(desk, spot).reverse();
+    return { ...alongPath(path, t), sit: t >= 1 ? 1 : 0, face: null, merge: 0 };
   }
 
   if (s <= M + 0.2) return seated(desk);
@@ -189,16 +208,17 @@ export function leafTurn(i, s) {
   return smoothRange(E + k + 0.3, E + k + 0.85, s);
 }
 
-/** Index of the project on the whiteboard, and whether the team is presenting it. */
-export const isPresenting = (s) => s > B + 0.05 && s < STOPS.experienceStart - 0.7;
-export const boardIndex = (s) => Math.min(3, Math.max(0, Math.round(s - STOPS.projectsStart)));
+/** Index of the project being built on the model floor. */
+export const projectIndex = (s) => Math.min(3, Math.max(0, Math.round(s - STOPS.projectsStart)));
 
 // ---------- camera ----------
 // `offset` shifts the view sideways (or down on mobile) so the subject sits
 // beside the text panel instead of behind it.
-const boardShot = (i) => {
-  const drift = (i - 1.5) * 0.35;
-  return { pos: [2.6 + drift, 4.4, 1.8], look: [drift * 0.4, 1.9, WHITEBOARD.z], offset: 1 };
+// Looking down over the model floor, like leaning over a model-maker's table.
+const modelShot = (i) => {
+  const drift = (i - 1.5) * 0.4;
+  const { x, z } = MODEL_FLOOR;
+  return { pos: [x + 2.8 + drift, 12.4, z + 13.8], look: [x + 0.9 + drift * 0.4, 0, z - 0.9], offset: 1, mobileZoom: 1.45, mobileOffset: 1.1 };
 };
 // Looking down at the open book over the reader's shoulder; drifts a little per chapter.
 const bookShot = (k) => {
@@ -210,7 +230,7 @@ const bookShot = (k) => {
 const CAMERA_KEYS = [
   // mobileZoom: how far phones pull back (default 1.5×); the wide office needs less on a narrow screen.
   { pos: [2.5, 14.5, 23.5], look: [1, 0.2, -3.6], offset: 0, mobileZoom: 0.52 },
-  ...[0, 1, 2, 3].map(boardShot),
+  ...[0, 1, 2, 3].map(modelShot),
   ...Array.from({ length: JOBS }, (_, k) => bookShot(k)),
   // On phones the contact panel covers the lower half, so lift the scene above it.
   { pos: [0, 2.9, 8.6], look: [0, 1.6, HERO.z], offset: 0, mobileOffset: 0.9 },
