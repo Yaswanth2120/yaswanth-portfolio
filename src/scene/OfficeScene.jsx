@@ -79,15 +79,27 @@ function Outlined({ geo, fill, line, ...props }) {
 // Every surface registers here so the updater can fade and redraw them together.
 const surfaces = new Set();
 
+// Canvas resolution per kind of surface, as a multiple of its drawing size, so
+// text stays sharp on high-density screens where these are seen large (the
+// cards, the final screens, the book). Draw functions keep their logical sizes;
+// the context is scaled. Phones get a bit less to save memory.
+const RESOLUTION = { card: 3, finale: 3, tag: 2.5, zone: 2, book: 2 };
+const resolutionOf = (kind) => {
+  const k = RESOLUTION[kind] ?? 1.5;
+  return scroll.mobile ? Math.max(1, k * 0.7) : k;
+};
+
 function useSurface(width, height, draw, animated, kind = null) {
   const surface = useMemo(() => {
+    const k = resolutionOf(kind);
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = Math.round(width * k);
+    canvas.height = Math.round(height * k);
     const ctx = canvas.getContext("2d");
+    ctx.scale(canvas.width / width, canvas.height / height);
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
+    tex.anisotropy = 8;
     draw(ctx, width, height, 0);
     tex.needsUpdate = true;
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false });

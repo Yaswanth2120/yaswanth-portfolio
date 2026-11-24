@@ -58,7 +58,6 @@ export function drawAgentCard(ctx, w, h, { agent, project, feature, you = false 
 
   const who = you ? "YASWANTH" : `AGENT ${pad(agent + 1)}`;
   text(ctx, `${who} · ${proj.name.toUpperCase()}`, 36, 56, mono(20), 0.7);
-  text(ctx, "CLICK AGAIN ↻", w - 36, 56, mono(18), 0.5, "right");
   text(ctx, you ? "BUILDING RIGHT NOW" : "WORKING ON", 36, 104, mono(17), 0.5);
   fitText(ctx, item.title, 36, 170, (s) => serif(s, 500), 72, w - 72, 1);
   ctx.font = sans(26);
